@@ -134,7 +134,7 @@ namespace StoreRobberyEnhanced.Debug
         // ------------------------------------------------------------
         public static void TriggerBanner()
         {
-            StoreContext.GlobalUi.ShowHeistPassedBanner("DEBUG BANNER", "This is a test banner.");
+            StoreContext.GlobalUi.ShowHeistPassedBanner("~y~MISSION PASSED", "500000", "24/7 Supermarket (Vinewood Plaza)");
         }
 
         // ------------------------------------------------------------

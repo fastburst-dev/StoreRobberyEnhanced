@@ -162,6 +162,11 @@ namespace StoreRobberyEnhanced.Systems
                 _debugEscapeActive = true;
                 _debugEscapeStoreId = store.Id;
 
+                // ⭐ Clear any stuck police state
+                Game.Player.WantedLevel = 0;
+                store.AlarmTriggered = false;
+                store.PlayerMaskedAtStart = false;
+
                 // ⭐ Suppress ALL police (both systems)
                 _ctx.Police.SuppressPoliceForDebug = true;
 
@@ -177,31 +182,16 @@ namespace StoreRobberyEnhanced.Systems
                 foreach (var cam in store.Cameras)
                     cam.Destroyed = false;
 
+                // ⭐ Simulate robbery start so the REAL timer runs
+                store.RobberyStartUtc = DateTime.UtcNow;
+
                 // ⭐ Ensure payout exists
                 if (store.PendingPayout <= 0)
                     store.PendingPayout = _ctx.Rng.Next(2500, 50000);
 
-                float dist = Game.Player.Character.Position.DistanceTo(store.StorePos);
-
-                // ⭐ If player is still inside escape radius → show persistent subtitle
-                if (dist < _ctx.Config.EscapeDistance)
-                {
-                    _ctx.Ui.ShowSubtitle("Robbery complete! Escape the area.", 3000);
-                    return 0;
-                }
-
-                // ⭐ Player is far enough → complete robbery
                 DebugLogger.Info($"DebugForcePayout: awarding payout + cooldown for store {store.Id}");
 
-                store.IsRobberyActive = false;
-
-                AwardPayout(store);
-                BeginCooldown(store);
-
                 int payout = store.PendingPayout;
-
-                // ⭐ Disable debug suppression
-                _ctx.Police.SuppressPoliceForDebug = false;
 
                 return payout;
             }
@@ -298,6 +288,9 @@ namespace StoreRobberyEnhanced.Systems
             // ------------------------------------------------------------
             Game.Player.WantedLevel = 0;
             _ctx.Police.SuppressPoliceForDebug = false;
+
+            // ⭐ Remove any existing cooldown blocker before creating a new one
+            _ctx.Cooldowns.RemoveCooldownBlocker(store);
 
             DebugLogger.Info($"DebugResetStore: store {store.Id} fully reset");
 
@@ -404,7 +397,7 @@ namespace StoreRobberyEnhanced.Systems
 
                         _testTimerActive = false;
                         StoreContext.GlobalUi.ClearTimer();
-                        StoreContext.GlobalUi.ShowHeistPassedBanner("~o~ROBBERY COMPLETE", "~y~Earned $100000");
+                        StoreContext.GlobalUi.ShowHeistPassedBanner("~o~ROBBERY COMPLETE", "100000", "Convinence Store");
                         return;
                     }
                     else
@@ -1258,7 +1251,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (!wasDebugEscape)
                 {
                     Game.Player.Money += payout;
-                    StoreContext.GlobalUi.ShowHeistPassedBanner("~o~ROBBERY COMPLETE", $"~g~Earned ${payout}");
+                    StoreContext.GlobalUi.ShowHeistPassedBanner("~o~MISSION COMPLETE", $"{payout}", $"{store.Name}");
 
                     // ⭐ Prevent Shop Menu UI from overwriting the banner
                     ShopMenuUI.BlockUIForSeconds(3);
@@ -1267,7 +1260,7 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     DebugLogger.Info($"Awarding payout: store={store.Id}, payout={payout}, DebugState={wasDebugEscape}");
                     _ctx.Ui.ShowNotification("~y~DEBUG STATE ESCAPE COMPLETED~n~(no actual payout).");
-                    StoreContext.GlobalUi.ShowHeistPassedBanner("~o~ROBBERY COMPLETE", $"~g~Earned ${payout}");
+                    StoreContext.GlobalUi.ShowHeistPassedBanner("~o~MISSION COMPLETE", $"{payout}", $"{store.Name}");
 
                     // ⭐ Prevent Shop Menu UI from overwriting the banner
                     ShopMenuUI.BlockUIForSeconds(3);

@@ -3,14 +3,68 @@ using GTA.Native;
 using LemonUI.Scaleform;
 using StoreRobberyEnhanced.Debug;
 using System;
+using System.Collections.Generic;
 using System.Drawing;
 
 namespace StoreRobberyEnhanced.UI
 {
     internal class UiHelpers
     {
+        private readonly IniConfig _config;
+
+        // ------------------------------------------------------------
+        // BANNER CORE
+        // ------------------------------------------------------------
+
+        public enum BannerType
+        {
+            HeistPassed,
+            HeistFailed,
+            LevelUp,
+            Achievement,
+            Purchase,
+            Generic
+        }
+
+        private class ActiveBanner
+        {
+            public BannerType Type;
+            public string Title;
+            public string Subtitle;
+            public int StartTime;
+            public int DurationMs;
+            public Scaleform Main;        // MP_BIG_MESSAGE_FREEMODE
+            public Scaleform Background;  // MP_RESULTS_PANEL
+            public bool PlaySound;
+        }
+
+        private readonly Queue<ActiveBanner> _bannerQueue = new Queue<ActiveBanner>();
+        private ActiveBanner _currentBanner;
+
+        private bool _suppressUiUntilBannerDone = false;
+
+        public bool IsBannerActive =>
+            _currentBanner != null &&
+            Game.GameTime <= _currentBanner.StartTime + _currentBanner.DurationMs;
+
+        // ------------------------------------------------------------
+        // LEGACY FIELDS (TIMER + OLD BANNER)
+        // ------------------------------------------------------------
+
+        private string _activeTimerText = null;
+        private int _activeTimerSeconds = 0;
+
+        private float _timerAlpha = 0f;
+        private bool _timerVisible = false;
+        private int _timerFadeSpeed = 5;
+        private bool _useScaleformTimer = false;
+
+        private Scaleform _timerScaleform = null;
+
+        // Backwards-compat fields
         private Scaleform _heistScaleform;
-        private IniConfig _config;
+        private Scaleform _celebration;
+        private int _heistBannerEndTime = 0;
 
         public UiHelpers(IniConfig config)
         {
@@ -24,23 +78,6 @@ namespace StoreRobberyEnhanced.UI
                 DebugLogger.LogException("UiHelpers.ctor", ex);
             }
         }
-
-        // Timer system
-        private string _activeTimerText = null;
-        private int _activeTimerSeconds = 0;
-
-        private float _timerAlpha = 0f;
-        private bool _timerVisible = false;
-        private int _timerFadeSpeed = 5;
-        private bool _useScaleformTimer = false;
-
-        private Scaleform _timerScaleform = null;
-        private int _heistBannerEndTime = 0;
-        private bool _suppressUiUntilBannerDone = false;
-        private Scaleform _celebration;
-
-        public bool IsBannerActive => _heistScaleform != null && Game.GameTime <= _heistBannerEndTime;
-
 
         // ------------------------------------------------------------
         // NOTIFICATION
@@ -74,6 +111,9 @@ namespace StoreRobberyEnhanced.UI
             }
         }
 
+        // ------------------------------------------------------------
+        // SHOW HELP TEXT (TOP-LEFT INSTRUCTIONAL)
+        // ------------------------------------------------------------
         public void ShowHelpText(string text)
         {
             try
@@ -91,30 +131,157 @@ namespace StoreRobberyEnhanced.UI
         }
 
         // ------------------------------------------------------------
-        // BIG HEIST BANNER
+        // PUBLIC BANNER API
         // ------------------------------------------------------------
-        public void ShowHeistPassedBanner(string title, string subtitle)
+        public void ShowHeistPassedBanner(string title, string subtitle, string storeName = null)
         {
             try
             {
-                DebugLogger.Info($"ShowHeistPassedBanner: {title} / {subtitle}");
+                DebugLogger.Info($"ShowHeistPassedBanner: {title} / {subtitle} / {storeName}");
 
-                // ⭐ 1. Load cinematic ONLINE background
-                _celebration = new Scaleform("MP_CELEBRATION");
-                _celebration.CallFunction("CREATE_STAT_WALL", title, subtitle, "", true, 0, "");
+                // If storeName is provided, build the two-line subtitle
+                string finalSubtitle;
+                if (!string.IsNullOrEmpty(storeName))
+                {
+                    // Example: "24/7 Supermarket Robbery Complete\nTotal amount earned: $500000"
+                    finalSubtitle = $"{storeName} - Robbery Completed\nTotal amount earned: ${subtitle}";
+                }
+                else
+                {
+                    // Fallback: keep original behavior (just payout)
+                    finalSubtitle = $"Total amount earned: ${subtitle}";
+                }
 
-                // ⭐ 2. Load the main big message banner
-                _heistScaleform = new Scaleform("MP_BIG_MESSAGE_FREEMODE");
-                _heistScaleform.CallFunction("SHOW_SHARD_CENTERED_MP_MESSAGE", title, subtitle, 21, true, false);
-
-                _heistBannerEndTime = Game.GameTime + 6000;
-
-                // ⭐ Suppress all other UI
-                _suppressUiUntilBannerDone = true;
+                EnqueueBanner(new ActiveBanner
+                {
+                    Type = BannerType.HeistPassed,
+                    Title = title,
+                    Subtitle = finalSubtitle,
+                    DurationMs = 10000,
+                    PlaySound = true
+                });
             }
             catch (Exception ex)
             {
                 DebugLogger.LogException("UiHelpers.ShowHeistPassedBanner", ex);
+            }
+        }
+
+        private void EnqueueBanner(ActiveBanner banner)
+        {
+            if (_currentBanner == null)
+            {
+                StartBanner(banner);
+            }
+            else
+            {
+                _bannerQueue.Enqueue(banner);
+                DebugLogger.Trace($"Banner queued: {_bannerQueue.Count} in queue");
+            }
+        }
+
+        // ------------------------------------------------------------
+        // ⭐ StartBanner — Rockstar Composite Banner
+        // ------------------------------------------------------------
+        private void StartBanner(ActiveBanner banner)
+        {
+            try
+            {
+                DebugLogger.Trace($"StartBanner: {banner.Type} / {banner.Title}");
+
+                banner.StartTime = Game.GameTime;
+
+                // Heist-style banners use Rockstar composite scaleforms
+                if (banner.Type == BannerType.HeistPassed ||
+                    banner.Type == BannerType.HeistFailed ||
+                    banner.Type == BannerType.LevelUp)
+                {
+                    banner.Background = new Scaleform("MP_RESULTS_PANEL");
+                    banner.Main = new Scaleform("MP_BIG_MESSAGE_FREEMODE");
+
+                    Script.Wait(100); // allow initialization
+
+                    // Background: payout + icon
+                    banner.Background.CallFunction(
+                        "SHOW_MISSION_PASSED_MESSAGE",
+                        banner.Title,
+                        banner.Subtitle,
+                        100,     // fade speed
+                        true     // show background
+                    );
+
+                    // Foreground: gold shard
+                    banner.Main.CallFunction(
+                        "SHOW_SHARD_CENTERED_MP_MESSAGE",
+                        banner.Title,
+                        banner.Subtitle,
+                        21,      // gold shard style
+                        true,
+                        false
+                    );
+
+                    if (banner.PlaySound)
+                    {
+                        Function.Call(Hash.PLAY_SOUND_FRONTEND, -1,
+                            "Mission_Pass_Notify",
+                            "DLC_HEISTS_GENERAL_FRONTEND_SOUNDS");
+                    }
+                }
+                else
+                {
+                    // Non-heist banners use original scaleform
+                    banner.Main = new Scaleform("MP_BIG_MESSAGE_FREEMODE");
+
+                    banner.Main.CallFunction(
+                        "SHOW_SHARD_CENTERED_MP_MESSAGE",
+                        banner.Title,
+                        banner.Subtitle,
+                        0, true, false);
+
+                    if (banner.PlaySound)
+                    {
+                        Function.Call(Hash.PLAY_SOUND_FRONTEND, -1,
+                            "CONFIRM_BEEP",
+                            "HUD_MINI_GAME_SOUNDSET");
+                    }
+                }
+
+                _currentBanner = banner;
+                _suppressUiUntilBannerDone = true;
+
+                _heistScaleform = banner.Main;
+                _celebration = banner.Background;
+                _heistBannerEndTime = banner.StartTime + banner.DurationMs;
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogException("UiHelpers.StartBanner", ex);
+            }
+        }
+
+        private void EndCurrentBanner()
+        {
+            try
+            {
+                if (_currentBanner != null)
+                {
+                    DebugLogger.Trace($"EndCurrentBanner: {_currentBanner.Type} / {_currentBanner.Title}");
+                }
+
+                _currentBanner = null;
+                _heistScaleform = null;
+                _celebration = null;
+                _suppressUiUntilBannerDone = false;
+
+                if (_bannerQueue.Count > 0)
+                {
+                    var next = _bannerQueue.Dequeue();
+                    StartBanner(next);
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogException("UiHelpers.EndCurrentBanner", ex);
             }
         }
 
@@ -149,7 +316,7 @@ namespace StoreRobberyEnhanced.UI
         }
 
         // ------------------------------------------------------------
-        // DRAW LOOP (FINAL FIXED VERSION)
+        // DRAW LOOP
         // ------------------------------------------------------------
         public void Draw()
         {
@@ -161,54 +328,16 @@ namespace StoreRobberyEnhanced.UI
                 // ⭐ If UI is suppressed because a banner is active, skip everything
                 if (_suppressUiUntilBannerDone)
                 {
-                    // ⭐ Draw ONLINE background scene FIRST
-                    if (_celebration != null && _celebration.IsValid)
-                        _celebration.Render2D();
-
-                    // ⭐ Draw the main banner on top
-                    if (_heistScaleform != null)
-                    {
-                        if (_heistScaleform.IsValid)
-                            _heistScaleform.Render2D();
-
-                        // Banner still active → stop here
-                        if (Game.GameTime <= _heistBannerEndTime)
-                            return;
-
-                        // Banner expired → cleanup
-                        _heistScaleform = null;
-                        _celebration = null;
-                        _suppressUiUntilBannerDone = false;
-                    }
-
+                    DrawCurrentBanner();
                     return;
                 }
 
-                // ------------------------------------------------------------
-                // ⭐ 1. If banner is active, draw ONLY the banner
-                // ------------------------------------------------------------
-                if (_heistScaleform != null)
+                if (_currentBanner != null && IsBannerActive)
                 {
-                    DebugLogger.Trace($"[BannerDraw] Active={_heistScaleform != null}, Valid={_heistScaleform.IsValid}, Time={Game.GameTime}/{_heistBannerEndTime}");
-
-                    // ⭐ Draw ONLINE background scene FIRST
-                    if (_celebration != null && _celebration.IsValid)
-                        _celebration.Render2D();
-
-                    if (_heistScaleform.IsValid)
-                        _heistScaleform.Render2D();
-
-                    if (Game.GameTime <= _heistBannerEndTime)
-                        return;
-
-                    DebugLogger.Trace("Heist banner expired");
-                    _heistScaleform = null;
-                    _suppressUiUntilBannerDone = false;
+                    DrawCurrentBanner();
+                    return;
                 }
 
-                // ------------------------------------------------------------
-                // ⭐ 2. If no banner, draw timer (if active)
-                // ------------------------------------------------------------
                 if (_activeTimerText != null)
                     DrawTimer(_activeTimerText, _activeTimerSeconds);
             }
@@ -219,7 +348,101 @@ namespace StoreRobberyEnhanced.UI
         }
 
         // ------------------------------------------------------------
-        // TIMER CONTROL
+        // ⭐ DrawCurrentBanner — Composite Rendering
+        // ------------------------------------------------------------
+        private void DrawCurrentBanner()
+        {
+            try
+            {
+                if (_currentBanner == null)
+                    return;
+
+                int now = Game.GameTime;
+                int endTime = _currentBanner.StartTime + _currentBanner.DurationMs;
+
+                DebugLogger.Trace($"[BannerDraw] Type={_currentBanner.Type}, Time={now}/{endTime}");
+
+                if (_currentBanner.Type == BannerType.HeistPassed ||
+                    _currentBanner.Type == BannerType.HeistFailed ||
+                    _currentBanner.Type == BannerType.LevelUp)
+                {
+                    DrawCompositeMissionPassed(_currentBanner, now);
+                }
+                else
+                {
+                    if (_currentBanner.Background != null && _currentBanner.Background.IsValid)
+                    {
+                        Function.Call(Hash.SET_SCRIPT_GFX_DRAW_ORDER, 999);
+                        _currentBanner.Background.Render2D();
+                    }
+
+                    if (_currentBanner.Main != null && _currentBanner.Main.IsValid)
+                    {
+                        Function.Call(Hash.SET_SCRIPT_GFX_DRAW_ORDER, 1000);
+                        _currentBanner.Main.Render2D();
+                    }
+                }
+
+                if (now > endTime)
+                {
+                    DebugLogger.Trace("Banner expired");
+                    EndCurrentBanner();
+                }
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogException("UiHelpers.DrawCurrentBanner", ex);
+            }
+        }
+
+        // ------------------------------------------------------------
+        // ⭐ Rockstar Composite Banner Renderer
+        // ------------------------------------------------------------
+        private void DrawCompositeMissionPassed(ActiveBanner banner, int now)
+        {
+            try
+            {
+                int elapsed = now - banner.StartTime;
+                const int fadeInMs = 600;
+                const int fadeOutMs = 600;
+
+                float alpha = 1f;
+
+                if (elapsed < fadeInMs)
+                    alpha = elapsed / (float)fadeInMs;
+                else if (elapsed > banner.DurationMs - fadeOutMs)
+                    alpha = (banner.DurationMs - elapsed) / (float)fadeOutMs;
+
+                if (alpha <= 0f)
+                    return;
+
+                int a = (int)(alpha * 255);
+
+                // ⭐ Add this line here — black transparent background
+                Function.Call(Hash.DRAW_RECT, 0.5f, 0.5f, 1.0f, 1.0f, 0, 0, 0, 120);
+
+                // ⭐ Add this line here — green transparent background
+                Function.Call(Hash.DRAW_RECT, 0.5f, 0.5f, 1.0f, 1.0f, 30, 180, 60, 40);
+
+
+                // Background panel (money icon + payout)
+                Function.Call(Hash.SET_SCRIPT_GFX_DRAW_ORDER, 999);
+                if (banner.Background != null && banner.Background.IsValid)
+                    banner.Background.Render2D();
+
+                // Foreground shard (gold text)
+                Function.Call(Hash.SET_SCRIPT_GFX_DRAW_ORDER, 1000);
+                if (banner.Main != null && banner.Main.IsValid)
+                    banner.Main.Render2D();
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogException("UiHelpers.DrawCompositeMissionPassed", ex);
+            }
+        }
+
+        // ------------------------------------------------------------
+        // TIMER CONTROLS
         // ------------------------------------------------------------
         public void SetTimerText(string text, int secondsRemaining = 0)
         {
@@ -334,7 +557,9 @@ namespace StoreRobberyEnhanced.UI
 
                 if (cfg.TimerBackground)
                 {
-                    DrawTimerBackground(x, y, boxWidth, boxHeight, a, cfg.TimerBgOpacity, cfg.TimerBgR, cfg.TimerBgG, cfg.TimerBgB);
+                    DrawTimerBackground(x, y, boxWidth, boxHeight,
+                        a, cfg.TimerBgOpacity,
+                        cfg.TimerBgR, cfg.TimerBgG, cfg.TimerBgB);
                 }
 
                 Function.Call(Hash.SET_TEXT_FONT, 0);
@@ -357,14 +582,17 @@ namespace StoreRobberyEnhanced.UI
             }
         }
 
-        // ------------------------------------------------------------
-        // BACKGROUND BOX
-        // ------------------------------------------------------------
-        private void DrawTimerBackground(float x, float y, float width, float height, int alpha, float opacity, int r, int g, int b)
+        private void DrawTimerBackground(float x, float y, float width, float height,
+            int alpha, float opacity, int r, int g, int b)
         {
             try
             {
-                Function.Call(Hash.DRAW_RECT, x + width / 2f, y + height / 2f, width, height, r, g, b, (int)(alpha * opacity));
+                Function.Call(Hash.DRAW_RECT,
+                    x + width / 2f,
+                    y + height / 2f,
+                    width, height,
+                    r, g, b,
+                    (int)(alpha * opacity));
             }
             catch (Exception ex)
             {
