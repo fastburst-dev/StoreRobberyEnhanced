@@ -43,6 +43,7 @@ namespace StoreRobberyEnhanced.Data
         public int GreetingEndTime;
         public int ClerkSpawnTime;
         public int ClerkSurrenderStage = 0;
+        public int InteriorLoadTime;
 
         // Idle timing support
         public int LastIdleTime = 0; // GameTime of last idle animation start
@@ -103,7 +104,6 @@ namespace StoreRobberyEnhanced.Data
         // ------------------------------------------------------------
         public int CollectedPayout { get; set; } = 0;
 
-
         // Cooldown
         public bool CooldownActive;
         public DateTime LastRobbedUtc = DateTime.MinValue;
@@ -120,7 +120,8 @@ namespace StoreRobberyEnhanced.Data
         public bool ClerkStalling;
         public DateTime StallStartUtc = DateTime.MinValue;
         public int StallDurationMs;
-        public bool ClerkDeathHandled;
+        public bool ClerkDeathHandled { get; set; }
+        public bool ClerkDeathHandledCheck { get; set; }
         public bool ClerkKilledWithGun;
         public bool SilentRobbery;
 

@@ -4,6 +4,7 @@ using GTA.Native;
 using StoreRobberyEnhanced.Data;
 using StoreRobberyEnhanced.Debug;
 using System;
+using System.Runtime.ConstrainedExecution;
 
 namespace StoreRobberyEnhanced.Systems
 {
@@ -59,6 +60,18 @@ namespace StoreRobberyEnhanced.Systems
         {
             try 
             {
+                // ⭐ HARD STOP: never spawn a clerk during an active robbery
+                if (store.IsRobberyActive)
+                {
+                    return;
+                }
+
+                // ⭐ HARD STOP: never spawn a clerk after death
+                if (store.ClerkDeathHandledCheck)
+                {
+                    return;
+                }
+
                 // ⭐ Suppress wanted level only during replacement
                 Function.Call(Hash.SET_MAX_WANTED_LEVEL, 0);
                 Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, true);
@@ -67,19 +80,19 @@ namespace StoreRobberyEnhanced.Systems
 
                 // If our clerk already exists, just keep the area clean
                 if (store.Clerk != null && store.Clerk.Exists())
-            {
-                RemoveNearbyDefaultClerks(store, store.Clerk);
-                store.DefaultClerkRemoved = true;
-                return;
-            }
+                {
+                    RemoveNearbyDefaultClerks(store, store.Clerk);
+                    store.DefaultClerkRemoved = true;
+                    return;
+                }
 
-            // First time: remove default clerk, then spawn ours
-            RemoveNearbyDefaultClerks(store, null);
+                // First time: remove default clerk, then spawn ours
+                RemoveNearbyDefaultClerks(store, null);
 
-            _ctx.Clerks?.ForceSpawnClerk(store);
+                _ctx.Clerks.ForceSpawnClerk(store);
 
-            if (store.Clerk != null && store.Clerk.Exists())
-                store.DefaultClerkRemoved = true;
+                if (store.Clerk != null && store.Clerk.Exists())
+                    store.DefaultClerkRemoved = true;
             }
             catch (Exception ex)
             {
@@ -107,33 +120,36 @@ namespace StoreRobberyEnhanced.Systems
                 if (ped == null || !ped.Exists())
                     continue;
 
+                // Skip our real clerk
+                if (store.Clerk != null && ped.Handle == store.Clerk.Handle)
+                    continue;
+
+                // Skip dummy clerk
+                if (store.DummyClerk != null && ped.Handle == store.DummyClerk.Handle)
+                    continue;
+
+                // Skip explicitly provided ped
                 if (skip != null && ped.Handle == skip.Handle)
                     continue;
 
-                // mark that this was NOT our clerk
-                store.IsOurClerk = false;
-
-                // SHVDN 3.9.0: valid store clerk models
+                // Only treat Rockstar clerks as default clerks
                 if (Array.IndexOf(_defaultClerkModels, ped.Model.Hash) != -1)
                 {
-                    // Neutralize default clerk safely (NO wanted level)
+                    // Neutralize default clerk safely
                     ped.Task.ClearAllImmediately();
                     ped.BlockPermanentEvents = true;
                     ped.IsInvincible = true;
                     ped.CanBeTargetted = false;
 
-                    // Move him far away so Rockstar never sees him "die"
                     ped.Position = new Vector3(0f, 0f, 50f);
-
-                    // Release him cleanly
                     ped.IsPersistent = false;
                     ped.MarkAsNoLongerNeeded();
 
-                    // Mark that we just removed a native clerk for this store
                     store.NativeClerkRemovedRecently = true;
                     store.NativeClerkRemovedUtc = DateTime.UtcNow;
                 }
             }
         }
+
     }
 }

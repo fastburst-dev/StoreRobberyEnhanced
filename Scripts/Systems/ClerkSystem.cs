@@ -66,6 +66,10 @@ namespace StoreRobberyEnhanced.Systems
                 if (store == null)
                     return;
 
+                // ⭐ HARD STOP: if clerk died, never run clerk logic again
+                if (store.ClerkDeathHandledCheck)
+                    return;
+
                 // ⭐ Cooldown → clerk logic disabled
                 if (store.CooldownActive)
                     return;
@@ -96,16 +100,13 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ PATCH 10 — CLERK STATE MACHINE INTEGRITY GUARD
                 // ------------------------------------------------------------
 
-                // If clerk is dead → force all states off
-                if (clerk.IsDead)
+                // ⭐ SAFE DEATH CHECK — prevents false positives inside interiors
+                bool reallyDead = clerk.IsDead || clerk.Health <= 0 || clerk.IsInjured || Function.Call<bool>(Hash.IS_PED_FATALLY_INJURED, clerk);
+
+                if (reallyDead)
                 {
-                    store.ClerkStalling = false;
-                    store.ClerkOpeningRegister = false;
-                    store.ClerkGrabbingCash = false;
-                    store.ClerkThrowingBag = false;
-                    store.ClerkPanicking = false;
-                    store.ClerkFleeing = false;
-                    store.ClerkSurrenderStage = 0;
+                    DebugLogger.Info($"[UpdateClerk] Detected real death for store {store.Id}, calling HandleClerkDeath");
+                    HandleClerkDeath(store);
                     return;
                 }
 
@@ -251,14 +252,6 @@ namespace StoreRobberyEnhanced.Systems
                 if (store.DummyClerk != null && store.DummyClerk.Exists() &&
                     clerk.Handle == store.DummyClerk.Handle)
                 {
-                    return;
-                }
-
-                // ⭐ Clerk dead → no reaction logic
-                if (clerk.IsDead)
-                {
-                    if (store.IsOurClerk)
-                        HandleClerkDeath(store);
                     return;
                 }
 
@@ -1635,6 +1628,9 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
+        // ------------------------------------------------------------
+        // CLERK DEATH HANDLING LOGIC
+        // ------------------------------------------------------------
         private void HandleClerkDeath(TrackedStore store)
         {
             try
@@ -1642,24 +1638,30 @@ namespace StoreRobberyEnhanced.Systems
                 if (store == null)
                     return;
 
-                // Prevent double-processing
+                // ⭐ HARD STOP: if death already handled, never process again
                 if (store.ClerkDeathHandled)
                     return;
+
+                // ⭐ Arm the fuse immediately so any re-entrant calls are no-ops
+                store.ClerkDeathHandled = true;
 
                 Ped clerk = store.Clerk;
                 Ped player = Game.Player.Character;
 
                 // If clerk reference is gone, treat as dead
                 bool clerkExists = (clerk != null && clerk.Exists());
+                bool isDead = clerkExists && clerk.IsDead;
+                int health = clerkExists ? clerk.Health : 0;
+
+                DebugLogger.Info($"[DeathCheck] exists={clerkExists}, isDead={isDead}, health={health}");
 
                 // ============================================================
-                // KO / DEATH DETECTION (OLD SYSTEM LOGIC)
+                // KO / DEATH DETECTION
                 // ============================================================
 
-                // 1) NON-LETHAL KNOCKOUT
-                if (clerkExists && IsPedKnockedOut(clerk))
+                // 1) NON-LETHAL KNOCKOUT — ONLY IF ALIVE
+                if (clerkExists && !isDead && health > 0 && IsPedKnockedOut(clerk))
                 {
-                    store.ClerkDeathHandled = true;
                     store.ClerkKilledWithGun = false;
                     store.SilentRobbery = true;
 
@@ -1676,7 +1678,7 @@ namespace StoreRobberyEnhanced.Systems
 
                     _ctx.Stalker.QueueKnockoutMessage();
 
-                    // Continue to cleanup below
+                    DebugLogger.Info($"[KO] Clerk {clerk.Handle} knocked out at store {store.Id} / {store.Name}");
                 }
                 else
                 {
@@ -1687,10 +1689,9 @@ namespace StoreRobberyEnhanced.Systems
 
                     bool melee = _ctx.Player.IsMeleeWeapon(weapon);
 
-                    // 2) LETHAL KILL (GUN)
-                    if (!clerkExists || (clerk != null && clerk.IsDead && !melee))
+                    // 2) LETHAL KILL (GUN) — DEAD OR HANDLE INVALID
+                    if (!clerkExists || (isDead && !melee))
                     {
-                        store.ClerkDeathHandled = true;
                         store.ClerkKilledWithGun = true;
 
                         _ctx.Ui.TextNotification(
@@ -1704,11 +1705,12 @@ namespace StoreRobberyEnhanced.Systems
 
                         // Gun kill ALWAYS activates robbery
                         store.IsRobberyActive = true;
+
+                        DebugLogger.Info($"[GUN KILL] Clerk {clerk?.Handle} shot and killed at store {store.Id} / {store.Name}");
                     }
                     // 3) LETHAL KILL (MELEE)
-                    else if (clerk != null && clerk.IsDead && melee)
+                    else if (isDead && melee)
                     {
-                        store.ClerkDeathHandled = true;
                         store.ClerkKilledWithGun = false;
 
                         _ctx.Ui.TextNotification(
@@ -1719,11 +1721,13 @@ namespace StoreRobberyEnhanced.Systems
                         );
 
                         _ctx.Stalker.QueueMeleeKillMessage();
+
+                        DebugLogger.Info($"[MELEE KILL] Clerk {clerk.Handle} killed via melee at store {store.Id} / {store.Name}");
                     }
                 }
 
                 // ============================================================
-                // NEW SYSTEM CLEANUP (KEEP THIS)
+                // NEW SYSTEM CLEANUP
                 // ============================================================
                 store.Clerk = null;
                 store.IsOurClerk = false;
@@ -1742,6 +1746,8 @@ namespace StoreRobberyEnhanced.Systems
                     store.DummyClerk.Delete();
                     store.DummyClerk = null;
                 }
+
+                store.ClerkDeathHandledCheck = true;
             }
             catch (Exception ex)
             {

@@ -28,7 +28,8 @@ This isn’t a simple “point gun, get money” script.
 It’s a **full robbery ecosystem**, built to feel like Rockstar designed it for Story Mode:
 🔥 FEATURES
 🏪 Dynamic Store Robberies
-21 fully supported stores (20 Online stores + Ace Liquor)
+20 fully supported stores (19 Online stores + Ace Liquor)
+- 26 Stores if DLC stores are added.
 
 - Every store is tracked, saved, and managed  
   - Robbery states persist across sessions  
