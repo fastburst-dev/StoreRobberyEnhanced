@@ -1,4 +1,4 @@
-⭐ GTA5‑Mods Upload Description — Store Robbery Enhanced (v2.6.8.5 Latest Release)
+⭐ GTA5‑Mods Upload Description — Store Robbery Enhanced (v2.6.9.0 Latest Release)
 (Fully polished, cinematic, feature‑rich, and ready for upload)
 
 🏪 Store Robbery Enhanced — Bringing GTA Online’s Robbery Achievements to Single Player with some huge twists.
@@ -25,6 +25,7 @@ It’s a full robbery ecosystem, designed to feel like Rockstar built it themsel
 🔥 FEATURES
 🏪 Dynamic Store Robberies
 20 fully supported stores (19 Online stores + Ace Liquor)
+ * 26 Stores if DLC stores are added.
 
 Each store has persistent state tracking:
  * Robbed / Not Robbed
@@ -329,18 +330,24 @@ ClerkDeathHandled
 ClerkKilledWithGun
 LastRobbedUtc
 
-All 20 stores included.
+All 20 stores included and support for an addtion 6 Addon Stores listed below
+ * https://www.gta5-mods.com/maps/mlo-vinewood-plaza-24-7-add-on-sp-fivem
+ * https://www.gta5-mods.com/maps/mlo-vinewood-boulevard-24-7-add-on-sp-fivem
+ * https://www.gta5-mods.com/maps/mlo-vespucci-little-seoul-24-7-add-on-sp-fivem-ver-1-0
+ * https://www.gta5-mods.com/maps/mlo-elgin-hawick-24-7-add-on-sp-fivem
+ * https://www.gta5-mods.com/maps/mlo-korean-plaza-24-7-add-on-sp-fivem
+ * https://www.gta5-mods.com/maps/mlo-paleto-gas-station-fivem-sp-ready
 
 📦 INSTALLATION
 Requirements
-* ScriptHookV
-* FOR ENHANCED Version of game ScriptHookVDotNet 3.9.0 Enhanced
-* 👉 https://www.gta5-mods.com/tools/script-hook-v-net-enhanced
-* FOR LEGACY Version of game you need the SHVDN Nightly 3.7.0 min
-* 👉 https://github.com/scripthookvdotnet/scripthookvdotnet-nightly/releases/tag/v3.7.0-nightly.48
-* iFruitAddon2 - (Included)
-* .NET Framework 4.8
-* GTA V (Latest Version) LEGIT LEGAL COPY
+ * ScriptHookV
+ * FOR ENHANCED Version of game ScriptHookVDotNet 3.9.0 Enhanced
+ * 👉 https://www.gta5-mods.com/tools/script-hook-v-net-enhanced
+ * FOR LEGACY Version of game you need the SHVDN Nightly 3.7.0 min
+ * 👉 https://github.com/scripthookvdotnet/scripthookvdotnet-nightly/releases/tag/v3.7.0-nightly.48
+ * iFruitAddon2 - (Included)
+ * .NET Framework 4.8
+ * GTA V (Latest Version) LEGIT LEGAL COPY
 
 Install Steps
 1. Install ScriptHookV
@@ -371,6 +378,15 @@ v2.6.8.5
  * Fixed minor issues
  * Utilizing LemonUI for Shop Menu
  * Added Store Clerk Shop Menu System pop to mimic the in-game clerks with more items
+
+v2.6.9.0
+ * Fixed issues with cooldown invisible blocker not being removed
+ * Fixed issues with cooldowns not being applied properly
+ * Fixed infinite Wanted Level loop
+ * Fixed issue with Clerk Shop Menu UI that caused issues with the SafeCrack Minigame Timer
+ * Fixed issues with HandleClerkDeath not triggering properly
+ * Added Support for 6 DLC Addon Stores (list of supported DLC Store Addons above)
+ * Upgraded to Overhaul Complete Success Banner UI Logic and UI Display upon completion
 
 ⭐ CREDITS
 Created by James Neeley (FastBurst)  
