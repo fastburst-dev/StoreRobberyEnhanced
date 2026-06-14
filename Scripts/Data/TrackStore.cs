@@ -108,6 +108,8 @@ namespace StoreRobberyEnhanced.Data
         public bool CooldownActive;
         public DateTime LastRobbedUtc = DateTime.MinValue;
         public Prop CooldownBlocker;
+        public DateTime DebugCooldownEndUtc = DateTime.MinValue;
+
         // ------------------------------------------------------------
         // PATCH 11 SUPPORT — Cooldown tracking
         // ------------------------------------------------------------

@@ -18,7 +18,7 @@ namespace StoreRobberyEnhanced.Systems
 
         // ------------------------------------------------------------
         // DEBUG FORCE COOLDOWN
-        // ------------------------------------------------------------
+        // ------------------------------------------------------------        
         public void DebugForceCooldown()
         {
             try
@@ -35,36 +35,26 @@ namespace StoreRobberyEnhanced.Systems
                 DebugLogger.Info($"Forcing 30s debug cooldown on store {store.Id}");
 
                 // Simulate completed robbery state
-                store.IsRobbed = true;
+                store.IsRobbed = false;
                 store.SafeCracked = true;
                 store.PendingCompletion = false;
                 store.PendingPayout = 0;
+
+                // Activate cooldown
                 store.CooldownActive = true;
                 store.LastRobbedUtc = DateTime.UtcNow;
 
+                // Apply blocker + blip
                 ApplyCooldownBlocker(store);
                 UpdateStoreBlip(store);
                 _ctx.SaveStoreState(store);
 
                 _ctx.Ui.ShowNotification("~c~Cooldown forced (debug, 30s)");
-                var p = Game.Player.Character;
-                DebugLogger.Info($"DoorPos = new Vector3({p.Position.X}f, {p.Position.Y}f, {p.Position.Z}f);");
-                DebugLogger.Info($"DoorHeading = {p.Heading}f;");
 
-                // Wait 30 seconds, then reset store
-                Script.Wait(30000);
-                if (store.CooldownBlocker != null && store.CooldownBlocker.Exists())
-                {
-                    store.CooldownBlocker.Delete();
-                    store.CooldownBlocker = null;
-                    DebugLogger.Info($"Cooldown blocker removed for store {store.Id}");
-                }
+                // ⭐ NEW: mark debug cooldown end time
+                store.DebugCooldownEndUtc = DateTime.UtcNow.AddSeconds(30);
 
-                DebugLogger.Info($"Debug cooldown expired for store {store.Id}, resetting");
-                _ctx.Clerks.SpawnDummyClerk(store);
-                _ctx.Robberies.DebugResetStore(store);
-                _ctx.Ui.ShowNotification("~g~Debug cooldown expired — store reset");
-
+                DebugLogger.Info($"Debug cooldown active until {store.DebugCooldownEndUtc}");
             }
             catch (Exception ex)
             {
@@ -114,6 +104,27 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
+                // ⭐ DEBUG COOLDOWN HANDLING
+                if (store.DebugCooldownEndUtc != DateTime.MinValue)
+                {
+                    if (DateTime.UtcNow >= store.DebugCooldownEndUtc)
+                    {
+                        DebugLogger.Info($"Debug cooldown expired for store {store.Id}");
+                        store.DebugCooldownEndUtc = DateTime.MinValue;
+
+                        RemoveCooldownBlocker(store);
+                        ResetStore(store);
+                        _ctx.Ui.ShowNotification("~g~Debug cooldown expired — store reset");
+                    }
+                    else
+                    {
+                        // Show lockout subtitle just like real cooldown
+                        EnforceCooldownLockout(store, player);
+                    }
+
+                    return;
+                }
+
                 DebugLogger.Trace($"UpdateStoreCooldown({store.Id})");
 
                 if (store.CooldownActive && !IsStoreInCooldown(store))

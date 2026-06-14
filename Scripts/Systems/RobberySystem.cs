@@ -98,15 +98,23 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // DEBUG FORCE ESCAPE
+        // DEBUG FORCE ESCAPE (PATCHED)
         // ------------------------------------------------------------
         public void DebugForceEscape()
         {
             try
             {
+                // 🔧 Reset lingering debug state before starting
+                _debugEscapeActive = false;
+                _debugEscapeStoreId = -1;
+
                 var store = _ctx.GetNearestStore();
                 if (store == null)
                     return;
+
+                // 🔧 Clear any locked end state from previous run
+                store.RobberyEnded = false;
+                store.CooldownActive = false;
 
                 // ⭐ Mark this as a debug escape run
                 _debugEscapeActive = true;
@@ -148,12 +156,16 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // DEBUG FORCE PAYOUT
+        // DEBUG FORCE PAYOUT (PATCHED)
         // ------------------------------------------------------------
         public int DebugForcePayout()
         {
             try
             {
+                // 🔧 Reset lingering debug state before starting
+                _debugEscapeActive = false;
+                _debugEscapeStoreId = -1;
+
                 var store = _ctx.GetNearestStore();
                 if (store == null)
                     return 0;
@@ -207,6 +219,11 @@ namespace StoreRobberyEnhanced.Systems
         // ------------------------------------------------------------
         public void DebugResetStore(TrackedStore store)
         {
+            // 🔧 Reset lingering debug state
+            _debugEscapeActive = false;
+            _debugEscapeStoreId = -1;
+            store.RobberyEnded = false;
+
             // ------------------------------------------------------------
             // ⭐ CORE ROBBERY STATE
             // ------------------------------------------------------------
