@@ -875,6 +875,8 @@ namespace StoreRobberyEnhanced.Systems
                     clerk.Heading = store.RegisterHeading;
                 }
 
+                _ctx.Ui.ShowNotification("~y~Clerk is trying to stall! Keep an eye on him.");
+
                 // Begin register opening
                 store.ClerkOpeningRegister = true;
                 store.ClerkAnimStartUtc = DateTime.UtcNow;
@@ -942,6 +944,7 @@ namespace StoreRobberyEnhanced.Systems
                     ClearAllClerkPhases(store);
                     store.ClerkGrabbingCash = true;
 
+                    _ctx.Ui.ShowNotification("~y~Clerk is opening the register! Get ready to grab the cash.");
 
                     // Safety: clear tasks only if clerk is stable
                     if (!clerk.IsRagdoll && !store.ClerkFleeing)
@@ -1049,6 +1052,8 @@ namespace StoreRobberyEnhanced.Systems
                 ClearAllClerkPhases(store);
                 store.ClerkThrowingBag = true;
 
+                _ctx.Ui.ShowNotification("~y~Clerk is grabbing cash! Grab it before he tosses it!");
+
                 // Safety: only clear tasks if clerk is stable
                 if (!clerk.IsRagdoll && !store.ClerkFleeing)
                     clerk.Task.ClearAllImmediately();
@@ -1137,6 +1142,7 @@ namespace StoreRobberyEnhanced.Systems
                 ClearAllClerkPhases(store);
                 store.ClerkThrowingBag = true;
 
+                _ctx.Ui.ShowNotification("~y~Clerk is tossing the bag! Grab it before he flees!");
 
                 // ⭐ Safety: only clear tasks if clerk is stable
                 if (!clerk.IsRagdoll && !store.ClerkFleeing)
@@ -1226,6 +1232,7 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     clerk.Task.ClearAllImmediately();
                     clerk.Task.Cower(-1);
+                    _ctx.Ui.ShowNotification("~y~Clerk is panicking! Grab the cash and and crack the safe!");
                 }
             }
             catch (Exception ex)
@@ -1308,6 +1315,8 @@ namespace StoreRobberyEnhanced.Systems
                 0f,
                 false, false, false
             );
+
+            _ctx.Ui.ShowNotification("~y~Clerk is surrendering! Grab the cash and crack the safe!");
 
             store.ClerkSurrenderStage = 1;
             store.ClerkAnimStartUtc = DateTime.UtcNow;
@@ -1432,6 +1441,8 @@ namespace StoreRobberyEnhanced.Systems
                     store.ClerkThrowingBag ||
                     store.ClerkPanicking)
                     return;
+
+                _ctx.Ui.ShowNotification("~r~Clerk is fighting back! Take him down quickly!");
 
                 // ------------------------------------------------------------
                 // ⭐ FIGHT BACK
