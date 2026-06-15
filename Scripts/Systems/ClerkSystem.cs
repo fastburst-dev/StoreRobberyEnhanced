@@ -887,7 +887,7 @@ namespace StoreRobberyEnhanced.Systems
                 DebugLogger.LogException("ClerkSystem.ProcessStall", ex);
             }
         }
-        
+
         // ------------------------------------------------------------
         // REGISTER OPENING (PATCH 9B APPLIED)
         // ------------------------------------------------------------

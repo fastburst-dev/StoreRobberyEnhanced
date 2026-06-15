@@ -60,7 +60,7 @@ namespace StoreRobberyEnhanced.Systems
         // Main method to ensure default clerk is removed and replaced with our own
         private void EnsureDefaultClerkRemoved(TrackedStore store)
         {
-            try 
+            try
             {
                 // ⭐ HARD STOP: never spawn a clerk during an active robbery
                 if (store.IsRobberyActive)

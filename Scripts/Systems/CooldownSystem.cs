@@ -204,7 +204,7 @@ namespace StoreRobberyEnhanced.Systems
                 );
 
                 if (store.CooldownBlocker != null && store.CooldownBlocker.Exists())
-                {                    
+                {
                     store.CooldownBlocker.IsPositionFrozen = true;
                     store.CooldownBlocker.IsCollisionEnabled = true;
                     store.CooldownBlocker.IsVisible = false;

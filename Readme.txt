@@ -385,6 +385,8 @@ v2.6.9.0
  * Fixed infinite Wanted Level loop
  * Fixed issue with Clerk Shop Menu UI that caused issues with the SafeCrack Minigame Timer
  * Fixed issues with HandleClerkDeath not triggering properly
+ * Fixed minor issue with DebugForceCooldown resetting properly
+ * Fixed issue with infinite wanted level on failed robbery by wasted or busted
  * Added Support for 6 DLC Addon Stores (list of supported DLC Store Addons above)
  * Upgraded to Overhaul Complete Success Banner UI Logic and UI Display upon completion
 

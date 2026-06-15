@@ -312,7 +312,7 @@ namespace StoreRobberyEnhanced.Minigame
 
             Function.Call(Hash.SET_CONTROL_SHAKE, 0, 250, 200);
             Function.Call(Hash.PLAY_SOUND_FRONTEND, -1, "PICK_UP", "HUD_FRONTEND_DEFAULT_SOUNDSET");
-            
+
             _UiHelp.ShowSubtitle("~g~Safe cracked!", 3000);
 
             SafeCrackEvents.OnSafeCracked(_state.SafePos, payout);
