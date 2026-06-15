@@ -672,9 +672,8 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 // ⭐ PLAYER NOTIFICATION
                 // ------------------------------------------------------------
-                _ctx.Ui.ShowNotification(
-                    "~g~Clerk quietly hands over the register cash.~s~ Crack the safe before leaving."
-                );
+                _ctx.Ui.ShowNotification("~g~Clerk quietly hands over the register cash.~s~ Crack the safe before leaving.");
+                DebugLogger.Info($"Played silent robbery anim for store {store.Id} on clerk {clerk.Handle}");
             }
             catch (Exception ex)
             {
@@ -765,6 +764,8 @@ namespace StoreRobberyEnhanced.Systems
                     bool useShotgun = _rng.Next(0, 2) == 0;
                     store.ReactionType = useShotgun ? ClerkReactionType.FightShotgun : ClerkReactionType.FightPistol;
 
+                    _ctx.Ui.ShowNotification("~r~The clerk has decided to fight back!~s~");
+
                     DebugLogger.Info($"Clerk at store {store.Id} decided to fight back ({store.ReactionType})");
 
                     // Trigger combat behavior immediately
@@ -854,6 +855,9 @@ namespace StoreRobberyEnhanced.Systems
                                 0f,
                                 false, false, false
                             );
+
+                            _ctx.Ui.ShowNotification("~y~The clerk is stalling...~s~ Wait for them to open the register.");
+                            DebugLogger.Info($"Clerk at store {store.Id} is stalling for {store.StallDurationMs} ms.");
                         }
                     }
 
@@ -961,6 +965,9 @@ namespace StoreRobberyEnhanced.Systems
                             0f,
                             false, false, false
                         );
+
+                        _ctx.Ui.ShowNotification("~y~The clerk is opening the register...~s~ Get ready to grab the cash!");
+                        DebugLogger.Info($"Clerk at store {store.Id} is opening the register.");
                     }
                     else
                     {
@@ -1073,6 +1080,9 @@ namespace StoreRobberyEnhanced.Systems
                         0f,
                         false, false, false
                     );
+
+                    _ctx.Ui.ShowNotification("~y~The clerk is grabbing the cash...~s~ Get ready to toss the bag!");
+                    DebugLogger.Info($"Clerk at store {store.Id} is grabbing cash from the register.");
                 }
                 else
                 {
@@ -1161,6 +1171,9 @@ namespace StoreRobberyEnhanced.Systems
                         0f,
                         false, false, false
                     );
+
+                    _ctx.Ui.ShowNotification("~y~The clerk is tossing the bag...~s~ Grab it, crack the safe and get out of there!");
+                    DebugLogger.Info($"Clerk at store {store.Id} is tossing the bag.");
                 }
                 else
                 {
@@ -1226,6 +1239,8 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     clerk.Task.ClearAllImmediately();
                     clerk.Task.Cower(-1);
+                    _ctx.Ui.ShowNotification("~r~The clerk is panicking and cowering on the ground!~s~ Grab the bag and crack the safe!");
+                    DebugLogger.Info($"Clerk at store {store.Id} is panicking and cowering.");
                 }
             }
             catch (Exception ex)
@@ -1344,6 +1359,9 @@ namespace StoreRobberyEnhanced.Systems
                     0f,
                     false, false, false
                 );
+
+                _ctx.Ui.ShowNotification("~r~The clerk has surrendered!~s~ Grab the bag, crack the safe and get out of there!");
+                DebugLogger.Info($"Clerk at store {store.Id} has surrendered.");
 
                 store.ClerkSurrenderStage = 2;
                 store.ClerkAnimStartUtc = DateTime.UtcNow;

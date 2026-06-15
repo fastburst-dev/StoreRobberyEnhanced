@@ -172,7 +172,6 @@ namespace StoreRobberyEnhanced
                             store.CooldownActive = false;
                             store.LastRobbedUtc = DateTime.MinValue;
 
-                            // Apply cooldown visuals
                             // DO NOT APPLY COOLDOWN IF DEAD OR BUSTED AS ROBBERY IS A FAILURE, NOT A SUCCESS
                             //_ctx.Cooldowns.ApplyCooldownBlocker(store);
                             //_ctx.Cooldowns.UpdateStoreBlip(store);
