@@ -25,6 +25,12 @@ namespace StoreRobberyEnhanced.Systems
         private List<string> _callAnsweredMsgs;
         private List<string> _callIgnoredMsgs;
 
+        // Internal call/message state (used by ResetAfterDeath)
+        private bool _callActive = false;
+        private DateTime _callStartUtc = DateTime.MinValue;
+        private Queue<string> _messageQueue = new Queue<string>();
+        private DateTime _lastMessageUtc = DateTime.MinValue;
+
         private Queue<StalkerEvent> _eventQueue;
 
         private string _callerImage;
@@ -224,7 +230,6 @@ namespace StoreRobberyEnhanced.Systems
             { "youtube", ContactIcon.Youtube }
         };
 
-
         public StalkerSystem(StoreContext ctx)
         {
             try
@@ -257,6 +262,16 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
+        // Resets internal state after player death
+        public void ResetAfterDeath()
+        {
+            _callActive = false;
+            _callStartUtc = DateTime.MinValue;
+            _messageQueue.Clear();
+            _lastMessageUtc = DateTime.MinValue;
+        }
+
+        // Resolves icon name from INI to ContactIcon enum, defaults to Blank if invalid
         private ContactIcon ResolveIcon(string iconName)
         {
             if (string.IsNullOrWhiteSpace(iconName))
@@ -268,7 +283,6 @@ namespace StoreRobberyEnhanced.Systems
                 ? icon
                 : ContactIcon.Blank;
         }
-
 
         // ------------------------------------------------------------
         // DEBUG FORCE PHONE CALL
@@ -453,6 +467,7 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
+        // Sends a random message from the specified pool, respecting limits and cooldowns
         private void SendRandomMessage(List<string> pool)
         {
             try
@@ -538,6 +553,7 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
+        // Starts the iFruit call and sets up timeout handling
         private void StartCall()
         {
             try
@@ -551,7 +567,7 @@ namespace StoreRobberyEnhanced.Systems
                 }
 
                 // Destroy any existing phone first
-                Function.Call(Hash.DESTROY_MOBILE_PHONE);
+                CleanupPhone();
                 Function.Call(Hash.SET_MOBILE_PHONE_SCALE, 250.0f);
                 // ⭐ Position the phone bottom-right (GTA Online style)
                 //Function.Call(Hash.SET_MOBILE_PHONE_POSITION, 0.12f, -0.02f, 0.0f);
@@ -572,7 +588,7 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     DebugLogger.Info("Stalker call timed out — ending call");
                     _stalkerContact.EndCall();
-                    Function.Call(Hash.DESTROY_MOBILE_PHONE);
+                    CleanupPhone();
                 }
 
                 // ⭐ Clear in-progress flag after timeout
@@ -594,7 +610,7 @@ namespace StoreRobberyEnhanced.Systems
                 QueueMessage(_callAnsweredMsgs);
 
                 // Cleanup phone model + camera
-                Function.Call(Hash.DESTROY_MOBILE_PHONE);
+                CleanupPhone();
 
                 // ⭐ Call finished
                 _callInProgress = false;
@@ -619,7 +635,8 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
-        private void CleanupPhone()
+        // Clean up phone model and camera to prevent glitches
+        public void CleanupPhone()
         {
             try
             {

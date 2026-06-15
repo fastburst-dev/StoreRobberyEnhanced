@@ -36,9 +36,18 @@ namespace StoreRobberyEnhanced.Minigame
         private int _savedCameraMode = -1;
 
         // ⭐ REQUIRED BY RobberySystem
-        public bool IsRunning => _state.Active;
+        public bool IsRunning { get; private set; }
+
         public TrackedStore CurrentStore => _store;
 
+        // ------------------------------------------------------------
+        // STATE MANAGEMENT
+        // ------------------------------------------------------------
+        public void ResetState()
+        {
+            IsRunning = false;
+            SuppressStoreSystems();
+        }
 
         // ------------------------------------------------------------
         // CONSTRUCTOR

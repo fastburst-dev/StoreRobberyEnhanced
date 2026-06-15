@@ -1,8 +1,9 @@
-﻿using System;
-using System.Reflection;
-using GTA;
+﻿using GTA;
+using GTA.Native;
 using StoreRobberyEnhanced.Debug;
 using StoreRobberyEnhanced.UI;
+using System;
+using System.Reflection;
 
 namespace StoreRobberyEnhanced
 {
@@ -127,6 +128,83 @@ namespace StoreRobberyEnhanced
         {
             try
             {
+                // ============================================================
+                // PLAYER DEATH / BUSTED ROBBERY RESET (SHVDN 3.9.0 SAFE)
+                // ============================================================
+                bool playerDead = Game.Player.Character.IsDead;
+
+                // SHVDN 3.9.0-compatible busted detection
+                bool playerBusted =
+                    !playerDead &&
+                    Game.Player.WantedLevel == 0 &&
+                    !Game.Player.CanControlCharacter &&
+                    Function.Call<bool>(Hash.IS_PLAYER_BEING_ARRESTED, Game.Player, true);
+
+                if (playerDead || playerBusted)
+                {
+                    DebugLogger.Info("[DeathReset] Player died/busted — clearing robbery state");
+
+                    foreach (var store in _ctx.Stores)
+                    {
+                        if (store.IsRobberyActive || store.IsRobbed)
+                        {
+                            DebugLogger.Info($"[DeathReset] Resetting store {store.Id}");
+
+                            // Hard stop all robbery state
+                            store.IsRobberyActive = false;
+                            store.IsRobbed = false;
+                            store.RobberyEnded = true;
+                            store.PendingCompletion = false;
+                            store.PendingPayout = 0;
+                            store.SafeCracked = false;
+
+                            // Clear escalation + alarms
+                            store.AlarmTriggered = false;
+                            store.SilentRobbery = false;
+                            store.ClerkCallingPolice = false;
+                            store.ClerkReacted = false;
+                            store.ClerkDeathHandled = false;
+                            store.ClerkKilledWithGun = false;
+                            store.ClerkSurrenderStage = 0;
+                            store.HeatLevel = 0;
+
+                            // DO NOT ENTER COOLDOWN ROBBERY FAILED, NOT SUCCESS
+                            store.CooldownActive = false;
+                            store.LastRobbedUtc = DateTime.MinValue;
+
+                            // Apply cooldown visuals
+                            // DO NOT APPLY COOLDOWN IF DEAD OR BUSTED AS ROBBERY IS A FAILURE, NOT A SUCCESS
+                            //_ctx.Cooldowns.ApplyCooldownBlocker(store);
+                            //_ctx.Cooldowns.UpdateStoreBlip(store);
+
+                            if (_ctx.Stalker != null)
+                            {
+                                _ctx.Stalker.CleanupPhone();
+                                _ctx.Stalker.ResetAfterDeath();
+                            }
+
+                            // Persist
+                            _ctx.SaveStoreState(store);
+                        }
+                    }
+
+                    // Clear wanted level
+                    Game.Player.WantedLevel = 0;
+
+                    // Reset SafeCrack suppression
+                    if (_ctx.SafeCrack != null)
+                        _ctx.SafeCrack.ResetState();
+
+                    // Reset stalker system
+                    if (_ctx.Stalker != null)
+                        _ctx.Stalker.ResetAfterDeath();
+
+                    DebugLogger.Info("[DeathReset] Global robbery state cleared");
+                }
+
+                // ============================================================
+                // NORMAL GAME UPDATE
+                // ============================================================
                 if (_ctx != null)
                 {
                     _ctx.Update();
@@ -145,8 +223,8 @@ namespace StoreRobberyEnhanced
                 // -------------------------------
                 if (_ctx.Stalker != null)
                 {
-                    _ctx.Stalker.ProcessEvents();       // queued messages                    
-                    _ctx.Stalker.UpdatePhone(); 
+                    _ctx.Stalker.ProcessEvents();
+                    _ctx.Stalker.UpdatePhone();
                 }
 
                 // Debug overlays

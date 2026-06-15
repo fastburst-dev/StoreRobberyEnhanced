@@ -788,6 +788,19 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
+        // HELPER: Clear all clerk phases (used for safety resets)
+        // ------------------------------------------------------------
+        private void ClearAllClerkPhases(TrackedStore store)
+        {
+            store.ClerkStalling = false;
+            store.ClerkOpeningRegister = false;
+            store.ClerkGrabbingCash = false;
+            store.ClerkThrowingBag = false;
+            store.ClerkPanicking = false;
+            store.ClerkFleeing = false;
+        }
+
+        // ------------------------------------------------------------
         // STALL PROCESSING (PATCH 9A APPLIED)
         // ------------------------------------------------------------
         private void ProcessStall(TrackedStore store, Ped clerk)
@@ -850,7 +863,9 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 // ⭐ PATCH 9A — Stall finished → transition safety
                 // ------------------------------------------------------------
-                store.ClerkStalling = false;
+                //store.ClerkStalling = false;
+                ClearAllClerkPhases(store);
+                store.ClerkOpeningRegister = true;
 
                 // Prevent teleporting clerk while ragdolled or fleeing
                 if (!clerk.IsRagdoll && !store.ClerkFleeing)
@@ -872,7 +887,7 @@ namespace StoreRobberyEnhanced.Systems
                 DebugLogger.LogException("ClerkSystem.ProcessStall", ex);
             }
         }
-
+        
         // ------------------------------------------------------------
         // REGISTER OPENING (PATCH 9B APPLIED)
         // ------------------------------------------------------------
@@ -917,7 +932,16 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 if (!store.ClerkGrabbingCash)
                 {
-                    store.ClerkGrabbingCash = true; // move to cash grab phase
+                    store.ClerkOpeningRegister = false;
+                    store.ClerkStalling = false;
+                    store.ClerkThrowingBag = false;
+                    store.ClerkPanicking = false;
+                    store.ClerkFleeing = false;
+
+                    //store.ClerkGrabbingCash = true; // move to cash grab phase
+                    ClearAllClerkPhases(store);
+                    store.ClerkGrabbingCash = true;
+
 
                     // Safety: clear tasks only if clerk is stable
                     if (!clerk.IsRagdoll && !store.ClerkFleeing)
@@ -1018,6 +1042,11 @@ namespace StoreRobberyEnhanced.Systems
                 // TRANSITION TO BAG TOSS PHASE
                 // ------------------------------------------------------------
                 store.ClerkGrabbingCash = false;
+                store.ClerkOpeningRegister = false;
+                store.ClerkStalling = false;
+                store.ClerkPanicking = false;
+                store.ClerkFleeing = false;
+                ClearAllClerkPhases(store);
                 store.ClerkThrowingBag = true;
 
                 // Safety: only clear tasks if clerk is stable
@@ -1105,7 +1134,9 @@ namespace StoreRobberyEnhanced.Systems
                     return;
 
                 // ⭐ End bag‑toss phase
-                store.ClerkThrowingBag = false;
+                ClearAllClerkPhases(store);
+                store.ClerkThrowingBag = true;
+
 
                 // ⭐ Safety: only clear tasks if clerk is stable
                 if (!clerk.IsRagdoll && !store.ClerkFleeing)
@@ -1144,9 +1175,13 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 // TRANSITION TO SURRENDER SEQUENCE
                 // ------------------------------------------------------------
+                store.ClerkOpeningRegister = false;
+                store.ClerkGrabbingCash = false;
+                store.ClerkStalling = false;
                 store.ClerkPanicking = false;
 
                 // ⭐ PATCH 9D — force surrender, not flee
+                ClearAllClerkPhases(store);
                 store.ClerkFleeing = true;
                 store.ClerkSurrenderStage = 0;   // triggers surrender sequence next tick
             }

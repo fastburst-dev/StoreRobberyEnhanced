@@ -1062,7 +1062,13 @@ namespace StoreRobberyEnhanced.Systems
                     }
 
                     DebugLogger.Info($"Debug escape success at store {store.Id}");
+                    // ⭐ FULL STATE RESET
+                    store.RobberyEnded = true;
+                    store.IsRobbed = false;
                     store.IsRobberyActive = false;
+                    store.PendingCompletion = false;
+                    store.RobberyStartUtc = DateTime.MinValue;
+
                     AwardPayout(store);
                     BeginCooldown(store);
                     return;
@@ -1105,7 +1111,13 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     DebugLogger.Info($"Early escape success at store {store.Id}");
 
+                    // ⭐ FULL STATE RESET
+                    store.RobberyEnded = true;
+                    store.IsRobbed = false;
                     store.IsRobberyActive = false;
+                    store.PendingCompletion = false;
+                    store.RobberyStartUtc = DateTime.MinValue;
+
                     AwardPayout(store);
                     BeginCooldown(store);
                     return;

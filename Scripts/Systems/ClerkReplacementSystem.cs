@@ -35,6 +35,7 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
+        // Called every tick for the store update loop
         public void UpdateForStore(TrackedStore store, Ped player)
         {
             if (store == null)
@@ -56,6 +57,7 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
+        // Main method to ensure default clerk is removed and replaced with our own
         private void EnsureDefaultClerkRemoved(TrackedStore store)
         {
             try 
@@ -106,6 +108,7 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
+        // Remove nearby default clerks, except for the provided ped to skip (can be null)
         private void RemoveNearbyDefaultClerks(TrackedStore store, Ped skip)
         {
             Vector3 pos = store.ClerkPos;
@@ -150,6 +153,5 @@ namespace StoreRobberyEnhanced.Systems
                 }
             }
         }
-
     }
 }

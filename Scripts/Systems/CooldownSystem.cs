@@ -227,6 +227,9 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
+        // ------------------------------------------------------------
+        // BLOCKER REMOVAL
+        // ------------------------------------------------------------
         public void RemoveCooldownBlocker(TrackedStore store)
         {
             DebugLogger.Trace($"RemoveCooldownBlocker({store.Id})");
