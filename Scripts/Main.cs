@@ -142,8 +142,6 @@ namespace StoreRobberyEnhanced
 
                 if (playerDead || playerBusted)
                 {
-                    DebugLogger.Info("[DeathReset] Player died/busted — clearing robbery state");
-
                     foreach (var store in _ctx.Stores)
                     {
                         if (store.IsRobberyActive || store.IsRobbed)
@@ -172,11 +170,6 @@ namespace StoreRobberyEnhanced
                             store.CooldownActive = false;
                             store.LastRobbedUtc = DateTime.MinValue;
 
-                            // Apply cooldown visuals
-                            // DO NOT APPLY COOLDOWN IF DEAD OR BUSTED AS ROBBERY IS A FAILURE, NOT A SUCCESS
-                            //_ctx.Cooldowns.ApplyCooldownBlocker(store);
-                            //_ctx.Cooldowns.UpdateStoreBlip(store);
-
                             if (_ctx.Stalker != null)
                             {
                                 _ctx.Stalker.CleanupPhone();
@@ -199,12 +192,11 @@ namespace StoreRobberyEnhanced
                     if (_ctx.Stalker != null)
                         _ctx.Stalker.ResetAfterDeath();
 
-                    DebugLogger.Info("[DeathReset] Global robbery state cleared");
                 }
 
-                // ============================================================
+                // -------------------------------
                 // NORMAL GAME UPDATE
-                // ============================================================
+                // -------------------------------
                 if (_ctx != null)
                 {
                     _ctx.Update();
