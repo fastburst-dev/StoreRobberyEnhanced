@@ -328,9 +328,6 @@ namespace StoreRobberyEnhanced
                     Police.UpdatePoliceLogic(store, player);
                 }
 
-                // Draw global UI
-                // Ui.Draw();
-
                 // ⭐ Shop menu + interaction system
                 Shops.Tick();
 

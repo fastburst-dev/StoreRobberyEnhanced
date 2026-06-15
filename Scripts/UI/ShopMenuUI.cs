@@ -28,7 +28,39 @@ namespace StoreRobberyEnhanced.UI
             {
                 _ctx = ctx;
 
-                // Build correct subtitle based on store type
+                // ============================================================
+                // ⭐ HARD BLOCK: DO NOT INITIALIZE MENU DURING ROBBERY
+                // Prevents UI creation during robbery phases.
+                // ============================================================
+                if (_ctx.AnyRobberyActive)
+                {
+                    DebugLogger.Trace("ShopMenuUI.ctor blocked: robbery active");
+                    return;
+                }
+
+                // ============================================================
+                // ⭐ HARD BLOCK: DO NOT INITIALIZE MENU DURING SAFECRACK
+                // Prevents LemonUI texture creation during SafeCrack.
+                // ============================================================
+                if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
+                {
+                    DebugLogger.Trace("ShopMenuUI.ctor blocked: SafeCrack running");
+                    return;
+                }
+
+                // ============================================================
+                // ⭐ HARD BLOCK: DO NOT INITIALIZE MENU WHEN UI IS BLOCKED
+                // Protects Heist Passed banner and global UI states.
+                // ============================================================
+                if (DateTime.UtcNow < ShopMenuUI.UiBlockedUntil)
+                {
+                    DebugLogger.Trace("ShopMenuUI.ctor blocked: UI globally blocked");
+                    return;
+                }
+
+                // ============================================================
+                // ⭐ BUILD CORRECT SUBTITLE BASED ON STORE TYPE
+                // ============================================================
                 string subtitle = GetSubtitleForStore(store);
 
                 // Remove store name text from banner, use dynamic subtitle
@@ -37,7 +69,9 @@ namespace StoreRobberyEnhanced.UI
                 // Add to global pool
                 _ctx.MenuPool.Add(_menu);
 
-                // Apply correct Rockstar banner based on store type
+                // ============================================================
+                // ⭐ APPLY CORRECT ROCKSTAR BANNER BASED ON STORE TYPE
+                // ============================================================
                 _menu.Banner = new ScaledTexture(
                     new PointF(0f, 0f),
                     new SizeF(512f, 128f),
@@ -45,6 +79,9 @@ namespace StoreRobberyEnhanced.UI
                     GetBannerTextureName(store)
                 );
 
+                // ============================================================
+                // ⭐ BUILD MENU ITEMS
+                // ============================================================
                 BuildMenu();
             }
             catch (Exception ex)
@@ -162,11 +199,46 @@ namespace StoreRobberyEnhanced.UI
             }
         }
 
-        // Show the menu (called when player interacts with store)
+        // ============================================================
+        // SHOW THE MENU (called when player interacts with store)
+        // ============================================================
         public void Show()
         {
             try
             {
+                // ============================================================
+                // ⭐ HARD BLOCK: DO NOT SHOW MENU DURING ANY ROBBERY
+                // This prevents UI from appearing even if called externally.
+                // ============================================================
+                if (_ctx.AnyRobberyActive)
+                {
+                    DebugLogger.Trace("ShopMenuUI.Show blocked: robbery active");
+                    return;
+                }
+
+                // ============================================================
+                // ⭐ HARD BLOCK: DO NOT SHOW MENU DURING SAFECRACK
+                // Prevents timer flicker and UI takeover.
+                // ============================================================
+                if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
+                {
+                    DebugLogger.Trace("ShopMenuUI.Show blocked: SafeCrack running");
+                    return;
+                }
+
+                // ============================================================
+                // ⭐ HARD BLOCK: DO NOT SHOW MENU WHEN UI IS BLOCKED
+                // Protects Heist Passed banner and other global UI states.
+                // ============================================================
+                if (DateTime.UtcNow < ShopMenuUI.UiBlockedUntil)
+                {
+                    DebugLogger.Trace("ShopMenuUI.Show blocked: UI globally blocked");
+                    return;
+                }
+
+                // ============================================================
+                // ⭐ SAFE SHOW
+                // ============================================================
                 _menu.Visible = true;
             }
             catch (Exception ex)
@@ -175,11 +247,52 @@ namespace StoreRobberyEnhanced.UI
             }
         }
 
-        // Hide the menu (called when player walks away from store)
+        // ============================================================
+        // HIDE THE MENU (called when player walks away or forced close)
+        // ============================================================
         public void Hide()
         {
             try
             {
+                // ============================================================
+                // ⭐ ALWAYS HIDE MENU DURING ROBBERY
+                // Ensures no shop UI remains visible once robbery begins.
+                // ============================================================
+                if (_ctx.AnyRobberyActive)
+                {
+                    if (_menu.Visible)
+                        DebugLogger.Trace("ShopMenuUI.Hide: forced hide due to robbery");
+                    _menu.Visible = false;
+                    return;
+                }
+
+                // ============================================================
+                // ⭐ ALWAYS HIDE MENU DURING SAFECRACK
+                // Prevents UI flicker and input conflicts.
+                // ============================================================
+                if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
+                {
+                    if (_menu.Visible)
+                        DebugLogger.Trace("ShopMenuUI.Hide: forced hide due to SafeCrack");
+                    _menu.Visible = false;
+                    return;
+                }
+
+                // ============================================================
+                // ⭐ ALWAYS HIDE MENU WHEN UI IS BLOCKED
+                // Protects Heist Passed banner and other global UI states.
+                // ============================================================
+                if (DateTime.UtcNow < ShopMenuUI.UiBlockedUntil)
+                {
+                    if (_menu.Visible)
+                        DebugLogger.Trace("ShopMenuUI.Hide: forced hide due to UI block");
+                    _menu.Visible = false;
+                    return;
+                }
+
+                // ============================================================
+                // ⭐ NORMAL HIDE
+                // ============================================================
                 _menu.Visible = false;
             }
             catch (Exception ex)
@@ -187,6 +300,7 @@ namespace StoreRobberyEnhanced.UI
                 DebugLogger.Error($"ShopMenuUI.Hide: {ex}");
             }
         }
+
         // ============================================================
         // PURCHASE HANDLING
         // ============================================================
