@@ -485,8 +485,6 @@ namespace StoreRobberyEnhanced.Minigame
             _store.MaskEscalationApplied = false;
             _store.FightEscalationApplied = false;
             _store.TimeEscalationApplied = false;
-
-            DebugLogger.Info("[SafeCrack] Store systems suppressed for stealth safecrack");
         }
     }
 }
