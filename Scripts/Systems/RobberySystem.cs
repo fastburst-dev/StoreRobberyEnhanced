@@ -13,6 +13,7 @@ namespace StoreRobberyEnhanced.Systems
     internal class RobberySystem
     {
         private readonly StoreContext _ctx;
+        private readonly ClerkSystem _clerks;
         private int _lastTimerUpdate;
 
         // DEBUG TIMER FIELDS
@@ -47,6 +48,7 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
+        
         // ------------------------------------------------------------
         // DEBUG ROBBERY START
         // ------------------------------------------------------------
@@ -397,10 +399,130 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ If robbery is active, run core robbery logic
                 if (store.IsRobbed)
                 {
+                    // ------------------------------------------------------------
+                    // ⭐ PATCH O — Boundary enforcement
+                    // ------------------------------------------------------------
+                    if (!_ctx.Player.IsInsideStore(store, store.Radius))
+                    {
+                        DebugLogger.Warn($"[PATCH O] Player left store during robbery at store {store.Id}.");
+                        _clerks.ClearAllClerkPhases(store);
+                        store.ClerkStalling = true;
+                        store.PendingCompletion = false;
+                        return;
+                    }
+
+                    // ⭐ PATCH Q — Prevent robbery progression if clerk displaced
+                    if (_clerks.ValidateClerkPosition(store))
+                    {
+                        DebugLogger.Warn($"[PATCH Q] Clerk displacement detected during robbery at store {store.Id}. Pausing robbery.");
+                        return;
+                    }
+
+                    // ⭐ PATCH R — LOS persistence enforcement
+                    if (_clerks.ClerkLostLOS(store, player))
+                    {
+                        DebugLogger.Warn($"[PATCH R] Player broke LOS during robbery at store {store.Id}. Pausing robbery.");
+
+                        _clerks.ClearAllClerkPhases(store);
+                        store.ClerkStalling = true;
+                        store.PendingCompletion = false;
+
+                        _ctx.Ui.ShowNotification("~r~You broke line of sight — robbery paused.");
+                        return;
+                    }
+
+                    // ------------------------------------------------------------
+                    // ⭐ PATCH O — Threat persistence enforcement
+                    // Player must remain threatening according to robbery style
+                    // ------------------------------------------------------------
+                    if (!_clerks.PlayerThreatValid(store, store.Clerk, player))
+                    {
+                        DebugLogger.Warn($"[PATCH O] Player stopped threatening clerk during robbery at store {store.Id}. Pausing robbery.");
+
+                        _clerks.ClearAllClerkPhases(store);
+                        store.ClerkStalling = true;
+                        store.PendingCompletion = false;
+
+                        _ctx.Ui.ShowNotification("~r~Threat lost — robbery paused.");
+                        return;
+                    }
+
+                    // ------------------------------------------------------------
+                    // ⭐ PATCH O — Silent robbery proximity enforcement
+                    // Must remain in melee range
+                    // ------------------------------------------------------------
+                    if (store.SilentRobbery)
+                    {
+                        float distSilent = player.Position.DistanceTo(store.Clerk.Position);
+
+                        if (distSilent > 3.0f)
+                        {
+                            DebugLogger.Warn($"[PATCH O] Silent robbery broken — player moved too far at store {store.Id}.");
+
+                            _clerks.ClearAllClerkPhases(store);
+                            store.ClerkStalling = true;
+                            store.PendingCompletion = false;
+
+                            _ctx.Ui.ShowNotification("~r~Silent robbery broken — you moved too far.");
+                            return;
+                        }
+                    }
+
+                    // ⭐ PATCH S — Anti‑Cancel Logic (insert here)
+                    if (store.Clerk != null && store.Clerk.Exists())
+                    {
+                        if (store.ClerkOpeningRegister)
+                            _clerks.EnsureClerkAnimation(store, "anim@heists@ornate_bank@grab_cash", "enter");
+
+                        if (store.ClerkGrabbingCash)
+                            _clerks.EnsureClerkAnimation(store, "mp_common", "givetake1_a");
+
+                        if (store.ClerkThrowingBag)
+                            _clerks.EnsureClerkAnimation(store, "mp_common", "givetake2_a");
+                    }
+
+                    // ------------------------------------------------------------
+                    // Continue normal robbery logic
+                    // ------------------------------------------------------------
                     UpdateRobberyTimer(store);
                     CheckCameraTriggeredAlarm(store);
                     CheckLeavingEarly(store, player);
                     CheckEarlyEscapeSuccess(store, player);
+                }
+
+                // ------------------------------------------------------------
+                // ⭐ PATCH E — ROBBERY PHASE ADVANCEMENT VALIDATION
+                // ------------------------------------------------------------
+
+                // If clerk is supposed to be tossing the bag but no bag exists → halt advancement
+                if (store.ClerkThrowingBag && (store.LootBag == null || !store.LootBag.Exists()))
+                {
+                    DebugLogger.Warn($"[PATCH E] ClerkThrowingBag active but no loot bag exists for store {store.Id}. Halting robbery advancement.");
+
+                    // Reset to safe stall state
+                    store.ClerkThrowingBag = false;
+                    store.ClerkGrabbingCash = false;
+                    store.ClerkOpeningRegister = false;
+                    store.ClerkStalling = true;
+
+                    // Prevent robbery from completing early
+                    store.PendingCompletion = false;
+
+                    // Notify player
+                    _ctx.Ui.ShowNotification("~r~Clerk froze — robbery paused safely.");
+
+                    return;
+                }
+
+                // If clerk never reached bag toss phase → do NOT allow completion
+                if (store.PendingCompletion && !store.ClerkThrowingBag && (store.LootBag == null || !store.LootBag.Exists()))
+                {
+                    DebugLogger.Warn($"[PATCH E] PendingCompletion set but bag toss never occurred for store {store.Id}. Blocking completion.");
+
+                    store.PendingCompletion = false;
+                    store.ClerkStalling = true;
+
+                    return;
                 }
 
                 // ⭐ Debug timer override
@@ -446,26 +568,55 @@ namespace StoreRobberyEnhanced.Systems
                 }
 
                 // ------------------------------------------------------------
-                // ⭐ SAFECRACK INTERACTION TRIGGER (FINAL PATCHED)
+                // ⭐ PATCH N — SAFECRACK START VALIDATION (Silent + Loud)
                 // ------------------------------------------------------------
                 if (store.IsRobbed &&
                     store.SafePos != Vector3.Zero &&
                     !store.SafeCracked)
                 {
-                    if (_ctx.SafeState.Active)
+                    // Cannot start if SafeCrack already running
+                    if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
                         return;
 
+                    // ⭐ PATCH P — Cannot start SafeCrack if clerk ragdolled
+                    if (store.Clerk != null && store.Clerk.Exists() && store.Clerk.IsRagdoll)
+                        return;
+
+                    // Clerk must be fully surrendered before safe cracking
+                    if (!store.ClerkFleeing || store.ClerkSurrenderStage < 3)
+                        return;
+
+                    // ⭐ PATCH Q — Cannot start SafeCrack if clerk displaced
+                    if (_clerks.ValidateClerkPosition(store))
+                        return;
+
+                    // Player must be threatening according to robbery style
+                    // (Silent: melee + mask + close range, no LOS required)
+                    // (Loud: gun+aim OR melee, LOS required)
+                    if (!_clerks.PlayerThreatValid(store, store.Clerk, player))
+                        return;
+
+                    // ⭐ PATCH R — Cannot start SafeCrack if LOS broken (loud robbery only)
+                    if (_clerks.ClerkLostLOS(store, player))
+                        return;
+
+                    // ⭐ PATCH S — Cannot start SafeCrack if clerk animation is mid‑phase
+                    if (store.ClerkOpeningRegister || store.ClerkGrabbingCash || store.ClerkThrowingBag)
+                        return;
+
+                    // Player must be close enough to interact with the safe
                     float safeDist = player.Position.DistanceTo(store.SafePos);
+                    if (safeDist > 1.2f)
+                        return;
 
-                    if (safeDist < 1.2f)
+                    // Show prompt
+                    _ctx.Ui.ShowHelpText("Press ~y~E~w~ to crack the safe");
+
+                    // Start SafeCrack
+                    if (Game.IsControlJustPressed(GTA.Control.Context))
                     {
-                        _ctx.Ui.ShowHelpText("Press ~y~E~w~ to crack the safe");
-
-                        if (Game.IsControlJustPressed(GTA.Control.Context))
-                        {
-                            DebugLogger.Info($"Starting SafeCrack at store {store.Id}");
-                            _ctx.SafeCrack.Start(store, store.SafePos, store.SafeHeading, player);
-                        }
+                        DebugLogger.Info($"[PATCH N] Starting SafeCrack at store {store.Id}");
+                        _ctx.SafeCrack.Start(store, store.SafePos, store.SafeHeading, player);
                     }
                 }
 
@@ -975,7 +1126,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // SPAWN LOOT BAG
+        // SPAWN LOOT BAG (PATCH K — Final Safety Layer)
         // ------------------------------------------------------------
         public void SpawnLootBag(TrackedStore store, Ped clerk)
         {
@@ -984,21 +1135,77 @@ namespace StoreRobberyEnhanced.Systems
                 if (store == null || clerk == null || !clerk.Exists())
                     return;
 
-                // Prevent duplicates
-                if (store.LootBag != null && store.LootBag.Exists())
+                // ⭐ PATCH K — Phase must be correct
+                if (!store.ClerkThrowingBag)
+                {
+                    DebugLogger.Warn($"[PATCH K] Bag spawn attempted outside bag toss phase at store {store.Id}. Blocked.");
                     return;
+                }
 
-                Vector3 dropPos = clerk.Position + new Vector3(0f, 0f, -0.9f);
+                // ⭐ PATCH K — Prevent duplicate bags
+                if (store.LootBag != null && store.LootBag.Exists())
+                {
+                    DebugLogger.Warn($"[PATCH K] Bag already exists at store {store.Id}. Blocking duplicate spawn.");
+                    return;
+                }
+
+                // ⭐ PATCH K — Clerk must be stable
+                if (clerk.IsDead || clerk.IsRagdoll || store.ClerkFleeing)
+                {
+                    DebugLogger.Warn($"[PATCH K] Clerk unstable during bag spawn at store {store.Id}. Blocked.");
+                    return;
+                }
+
+                // ⭐ PATCH K — Clerk must be at register
+                if (!_clerks.IsClerkAtRegister(store, clerk))
+                {
+                    DebugLogger.Warn($"[PATCH K] Clerk displaced during bag spawn at store {store.Id}. Blocked.");
+                    return;
+                }
+
+                // ⭐ PATCH K — Clerk must be facing register
+                Vector3 toRegister = (store.RegisterPos - clerk.Position).Normalized;
+                float dot = Vector3.Dot(clerk.ForwardVector, toRegister);
+                if (dot < 0.35f)
+                {
+                    DebugLogger.Warn($"[PATCH K] Clerk not facing register during bag spawn at store {store.Id}. Blocked.");
+                    return;
+                }
+
+                // ⭐ PATCH K — Animation must be playing
+                if (!_clerks.IsPlayingAnim(clerk, "mp_common", "givetake2_a"))
+                {
+                    DebugLogger.Warn($"[PATCH K] Bag toss animation not playing at store {store.Id}. Blocked.");
+                    return;
+                }
+
+                // ⭐ Correct model: white trash bag
+                Model bagModel = new Model("prop_cs_rub_binbag_01");
+
+                if (!bagModel.IsValid || !bagModel.Request(2000))
+                {
+                    DebugLogger.Warn($"[PATCH K] Failed to load trash bag model for store {store.Id}. Blocked.");
+                    return;
+                }
+
+                // ⭐ Correct drop position
+                Vector3 dropPos =
+                    clerk.Position +
+                    (clerk.ForwardVector * 0.35f) +
+                    new Vector3(0f, 0f, -0.85f);
 
                 Prop bag = World.CreateProp(
-                    new Model("prop_cs_heist_bag_02"),
+                    bagModel,
                     dropPos,
                     true,
                     true
                 );
 
                 if (bag == null || !bag.Exists())
+                {
+                    DebugLogger.Warn($"[PATCH K] Bag spawn failed for store {store.Id}.");
                     return;
+                }
 
                 bag.IsPersistent = true;
                 bag.IsPositionFrozen = false;
@@ -1006,31 +1213,91 @@ namespace StoreRobberyEnhanced.Systems
                 // Store reference
                 store.LootBag = bag;
 
-                DebugLogger.Info($"Spawned loot bag for store {store.Id} at {dropPos}");
+                DebugLogger.Info($"[PATCH K] Spawned WHITE TRASH BAG for store {store.Id} at {dropPos}");
             }
             catch (Exception ex)
             {
-                DebugLogger.LogException("RobberySystem.SpawnLootBag", ex);
+                DebugLogger.LogException("RobberySystem.SpawnLootBag (PATCH K)", ex);
             }
         }
 
         // ------------------------------------------------------------
-        // DON'T LEAVE YET WARNING
+        // PATCH O — DON'T LEAVE YET + ANTI‑EXPLOIT MOVEMENT
         // ------------------------------------------------------------
         private void CheckLeavingEarly(TrackedStore store, Ped player)
         {
+            // SafeCrack running → do not interrupt
             if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
                 return;
 
-            // ⭐ Updated to use SafeCracked
-            if (store.IsRobbed &&
-                !store.SafeCracked &&
-                store.SafePos != new Vector3(0f, 0f, 0f) &&
+            // Only applies during an active robbery
+            if (!store.IsRobbed || store.CooldownActive)
+                return;
+
+            // ------------------------------------------------------------
+            // 1. PLAYER LEFT STORE BOUNDARY → PAUSE ROBBERY
+            // ------------------------------------------------------------
+            if (!_ctx.Player.IsInsideStore(store, store.Radius))
+            {
+                DebugLogger.Warn($"[PATCH O] Player left store boundary early at store {store.Id}. Pausing robbery.");
+
+                _clerks.ClearAllClerkPhases(store);
+                store.ClerkStalling = true;
+                store.PendingCompletion = false;
+
+                _ctx.Ui.ShowNotification("~r~You left the store — robbery paused.");
+                return;
+            }
+
+            // ------------------------------------------------------------
+            // 2. SAFE NOT CRACKED YET → SHOW WARNING IF PLAYER MOVES TOO FAR
+            // ------------------------------------------------------------
+            if (!store.SafeCracked &&
+                store.SafePos != Vector3.Zero &&
                 !store.CooldownActive)
             {
-                if (player.Position.DistanceTo(store.StorePos) > 10f)
+                float dist = player.Position.DistanceTo(store.StorePos);
+
+                // Player is still inside store radius but drifting too far
+                if (dist > 10f)
                 {
                     _ctx.Ui.ShowNotification("~y~Don't leave yet! Crack the safe to finish the robbery.");
+                }
+            }
+
+            // ------------------------------------------------------------
+            // 3. THREAT PERSISTENCE (PLAYER MUST REMAIN THREATENING)
+            // ------------------------------------------------------------
+            if (!_clerks.PlayerThreatValid(store, store.Clerk, player))
+            {
+                DebugLogger.Warn($"[PATCH O] Player stopped threatening clerk early at store {store.Id}. Pausing robbery.");
+
+                _clerks.ClearAllClerkPhases(store);
+                store.ClerkStalling = true;
+                store.PendingCompletion = false;
+
+                _ctx.Ui.ShowNotification("~r~Threat lost — robbery paused.");
+                return;
+            }
+
+            // ------------------------------------------------------------
+            // 4. SILENT ROBBERY SPECIAL RULES
+            // ------------------------------------------------------------
+            if (store.SilentRobbery)
+            {
+                float dist = player.Position.DistanceTo(store.Clerk.Position);
+
+                // Must remain in melee range
+                if (dist > 3.0f)
+                {
+                    DebugLogger.Warn($"[PATCH O] Silent robbery broken — player moved too far at store {store.Id}.");
+
+                    _clerks.ClearAllClerkPhases(store);
+                    store.ClerkStalling = true;
+                    store.PendingCompletion = false;
+
+                    _ctx.Ui.ShowNotification("~r~Silent robbery broken — you moved too far.");
+                    return;
                 }
             }
         }
