@@ -5,6 +5,8 @@ using StoreRobberyEnhanced.Data;
 using StoreRobberyEnhanced.Debug;
 using StoreRobberyEnhanced.UI;
 using System;
+using System.IO;
+using System.Security.Cryptography;
 
 namespace StoreRobberyEnhanced.Systems
 {
@@ -18,6 +20,17 @@ namespace StoreRobberyEnhanced.Systems
         {
             _ctx = ctx;
             _rng = new Random();
+        }
+
+        public enum ClerkPhase
+        {
+            None = 0,
+            Stall = 1,
+            RegisterOpening = 2,
+            CashGrab = 3,
+            BagToss = 4,
+            Flee = 5,
+            Surrender = 6
         }
 
         private bool IsThreateningSoft(Ped player, Ped clerk)
@@ -218,9 +231,11 @@ namespace StoreRobberyEnhanced.Systems
                     store.ClerkGrabbingCash = false;
                     store.ClerkThrowingBag = false;
                     store.ClerkPanicking = false;
-
-                    if (store.ClerkFleeing)
-                        ProcessFlee(store, clerk);
+                    store.ClerkFleeing = false;
+                    store.ClerkSurrenderStage = 0;
+                    store.ClerkSurrender = false;
+                    //if (store.ClerkFleeing)
+                    //    ProcessFlee(store, clerk);
 
                     return;
                 }
@@ -361,6 +376,12 @@ namespace StoreRobberyEnhanced.Systems
                 if (store.ClerkFleeing)
                 {
                     ProcessFlee(store, clerk);
+                    return;
+                }
+
+                if (store.ClerkSurrender)
+                {
+                    StartClerkSurrender(store, clerk);
                     return;
                 }
 
@@ -588,7 +609,10 @@ namespace StoreRobberyEnhanced.Systems
             // If ANY animation is playing, clerk is busy
             return Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "mp_common", "givetake1_a", 3) ||
                    Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "mp_common", "givetake2_a", 3) ||
-                   Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "anim@heists@ornate_bank@grab_cash", "enter", 3) ||
+                   Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "random@arrests", "idle_2_hands_up", 3) ||
+                   Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "rcmme_tracey1", "nervous_loop", 3) ||
+                   Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "oddjobs@shop_robbery@rob_till", "enter", 3) ||
+                   Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "oddjobs@shop_robbery@rob_till", "loop", 3) ||
                    Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "anim@heists@ornate_bank@grab_cash", "idle", 3) ||
                    Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "mp_am_hold_up", "purchase_beer_shopkeeper", 3);
         }
@@ -596,7 +620,7 @@ namespace StoreRobberyEnhanced.Systems
         // ------------------------------------------------------------
         // PATCH G — Clerk Position Validation
         // ------------------------------------------------------------
-        public bool IsClerkAtRegister(TrackedStore store, Ped clerk, float tolerance = 1.25f)
+        public bool IsClerkAtRegister(TrackedStore store, Ped clerk, float tolerance = 4.25f)
         {
             if (store == null || clerk == null || !clerk.Exists())
                 return false;
@@ -607,104 +631,132 @@ namespace StoreRobberyEnhanced.Systems
 
         // ------------------------------------------------------------
         // PATCH I — Unified Player Threat Validation (Silent + Loud)
-        // Uses PlayerHelper for LOS, melee, aiming, masking
+        // NULL-SAFE + PATCH U COMPATIBLE + NO DUPLICATE LOGIC
         // ------------------------------------------------------------
         public bool PlayerThreatValid(TrackedStore store, Ped clerk, Ped player)
         {
-            if (player == null || !player.Exists())
+            try
+            {
+                // ⭐ Absolute safety
+                if (store == null || clerk == null || player == null)
+                    return false;
+
+                if (!clerk.Exists() || !player.Exists())
+                    return false;
+
+                // ⭐ Position safety
+                if (clerk.Position == Vector3.Zero || player.Position == Vector3.Zero)
+                    return false;
+
+                PlayerHelper ph = _ctx.Player;
+                if (ph == null)
+                    return false;
+
+                // ------------------------------------------------------------
+                // 1. DISTANCE CHECK
+                // ------------------------------------------------------------
+                float dist = player.Position.DistanceTo(clerk.Position);
+
+                if (store.SilentRobbery)
+                {
+                    // Silent robbery requires very close range
+                    if (dist > 3.0f)
+                        return false;
+                }
+                else
+                {
+                    // Loud robbery threat radius
+                    if (dist > 8.0f)
+                        return false;
+                }
+
+                // ------------------------------------------------------------
+                // 2. LINE OF SIGHT CHECK
+                // ------------------------------------------------------------
+                if (!store.SilentRobbery)
+                {
+                    bool los = false;
+                    try { los = ph.IsInLOS(clerk); }
+                    catch { return false; }
+
+                    if (!los)
+                        return false;
+                }
+
+                // ------------------------------------------------------------
+                // 3. WEAPON + THREAT CHECK
+                // ------------------------------------------------------------
+                Weapon current = null;
+                try { current = player.Weapons?.Current; }
+                catch { current = null; }
+
+                bool hasWeapon = current != null && current.Hash != WeaponHash.Unarmed;
+
+                bool isMelee = false;
+                bool isGun = false;
+
+                if (hasWeapon)
+                {
+                    try { isMelee = ph.IsMeleeWeapon(current.Hash); }
+                    catch { isMelee = false; }
+
+                    isGun = !isMelee;
+                }
+
+                bool isAiming = false;
+                try { isAiming = ph.IsAiming(); }
+                catch { isAiming = false; }
+
+                // ------------------------------------------------------------
+                // 4. SILENT ROBBERY LOGIC
+                // ------------------------------------------------------------
+                if (store.SilentRobbery)
+                {
+                    // Must be melee
+                    if (!isMelee)
+                        return false;
+
+                    // Must NOT aim
+                    if (isAiming)
+                        return false;
+
+                    // Must be masked
+                    bool masked = false;
+                    try { masked = ph.IsMasked(); }
+                    catch { masked = false; }
+
+                    if (!masked)
+                        return false;
+
+                    // Must stay in front arc of clerk
+                    Vector3 toPlayer = (player.Position - clerk.Position).Normalized;
+                    float dot = Vector3.Dot(clerk.ForwardVector, toPlayer);
+
+                    if (dot < 0.0f)
+                        return false;
+
+                    return true;
+                }
+
+                // ------------------------------------------------------------
+                // 5. LOUD ROBBERY LOGIC
+                // ------------------------------------------------------------
+                // Gun + aiming = threat
+                if (isGun && isAiming)
+                    return true;
+
+                // Melee = threat (aiming optional)
+                if (isMelee)
+                    return true;
+
+                // No threat
                 return false;
-
-            PlayerHelper ph = _ctx.Player;
-
-            // ------------------------------------------------------------
-            // 1. DISTANCE CHECK
-            // ------------------------------------------------------------
-            float dist = player.Position.DistanceTo(clerk.Position);
-
-            if (store.SilentRobbery)
-            {
-                // Silent robbery requires very close range
-                if (dist > 3.0f)
-                    return false;
             }
-            else
+            catch
             {
-                // Loud robbery threat radius
-                if (dist > 8.0f)
-                    return false;
+                // ⭐ Fail-safe: never crash
+                return false;
             }
-
-            // ------------------------------------------------------------
-            // 2. LINE OF SIGHT CHECK
-            // ------------------------------------------------------------
-            if (!store.SilentRobbery)
-            {
-                // Loud robbery requires LOS
-                if (!ph.IsInLOS(clerk))
-                    return false;
-            }
-            // Silent robbery does NOT require LOS
-
-            // ------------------------------------------------------------
-            // 3. WEAPON + THREAT CHECK
-            // ------------------------------------------------------------
-            Weapon current = player.Weapons.Current;
-            bool hasWeapon = current != null && current.Hash != WeaponHash.Unarmed;
-
-            bool isMelee = hasWeapon && ph.IsMeleeWeapon(current.Hash);
-            bool isGun = hasWeapon && !isMelee;
-
-            bool isAiming = ph.IsAiming();
-
-            // ------------------------------------------------------------
-            // SILENT ROBBERY LOGIC
-            // ------------------------------------------------------------
-            if (store.SilentRobbery)
-            {
-                // Must be melee
-                if (!isMelee)
-                    return false;
-
-                // Must NOT aim
-                if (isAiming)
-                    return false;
-
-                // Must be masked
-                if (!ph.IsMasked())
-                    return false;
-
-                return true;
-            }
-
-            // ⭐ PATCH O — Silent robbery anti‑cheese
-            if (store.SilentRobbery)
-            {
-                // Must stay in front arc of clerk
-                Vector3 toPlayer = (player.Position - clerk.Position).Normalized;
-                float dot = Vector3.Dot(clerk.ForwardVector, toPlayer);
-
-                // If player moves behind clerk → silent robbery breaks
-                if (dot < 0.0f)
-                    return false;
-
-                // Must remain in melee range
-                if (dist > 3.0f)
-                    return false;
-            }
-
-            // ------------------------------------------------------------
-            // LOUD ROBBERY LOGIC
-            // ------------------------------------------------------------
-            // Gun + aiming = threat
-            if (isGun && isAiming)
-                return true;
-
-            // Melee = threat (aiming optional)
-            if (isMelee)
-                return true;
-
-            // No threat
-            return false;
         }
 
         // ------------------------------------------------------------
@@ -1075,6 +1127,9 @@ namespace StoreRobberyEnhanced.Systems
                 store.ClerkStalling = true;
                 store.StallStartUtc = DateTime.UtcNow;
                 store.StallDurationMs = _rng.Next(3000, 7000);
+
+                // ⭐ PATCH U — Lock phase
+                SetClerkPhase(store, ClerkPhase.Stall);
             }
             catch (Exception ex)
             {
@@ -1095,6 +1150,65 @@ namespace StoreRobberyEnhanced.Systems
             store.ClerkFleeing = false;
         }
 
+        public void SetClerkPhase(TrackedStore store, ClerkPhase phase)
+        {
+            store.CurrentPhase = phase;
+
+            // Clear all old flags
+            store.ClerkOpeningRegister = false;
+            store.ClerkGrabbingCash = false;
+            store.ClerkThrowingBag = false;
+            store.ClerkPanicking = false;
+            store.ClerkFleeing = false;
+            store.ClerkStalling = false;
+
+            // Set the correct flag
+            switch (phase)
+            {
+                case ClerkPhase.Stall:
+                    store.ClerkStalling = true;
+                    break;
+
+                case ClerkPhase.RegisterOpening:
+                    store.ClerkOpeningRegister = true;
+                    break;
+
+                case ClerkPhase.CashGrab:
+                    store.ClerkGrabbingCash = true;
+                    break;
+
+                case ClerkPhase.BagToss:
+                    store.ClerkThrowingBag = true;
+                    break;
+                
+                case ClerkPhase.Flee:
+                    store.ClerkFleeing = true;
+                    break;
+
+                case ClerkPhase.Surrender:
+                    store.ClerkSurrender = true;
+                    store.ClerkSurrenderStage = 1;
+                    break;
+            }
+        }
+
+        public bool IsValidPhaseTransition(ClerkPhase from, ClerkPhase to)
+        {
+            return (from, to) switch
+            {
+                (ClerkPhase.Stall, ClerkPhase.RegisterOpening) => true,
+                (ClerkPhase.RegisterOpening, ClerkPhase.CashGrab) => true,
+                (ClerkPhase.CashGrab, ClerkPhase.BagToss) => true,
+                (ClerkPhase.BagToss, ClerkPhase.Flee) => true,
+                (ClerkPhase.Flee, ClerkPhase.Surrender) => true,
+
+                // Allow staying in same phase
+                (var a, var b) when a == b => true,
+
+                _ => false
+            };
+        }
+
         // ------------------------------------------------------------
         // STALL PROCESSING (PATCH 9A + PATCH F + PATCH G APPLIED)
         // ------------------------------------------------------------
@@ -1107,10 +1221,6 @@ namespace StoreRobberyEnhanced.Systems
 
                 // ⭐ PATCH P — Ragdoll recovery
                 if (HandleClerkRagdoll(store))
-                    return;
-
-                // ⭐ PATCH Q — Position/heading validation
-                if (ValidateClerkPosition(store))
                     return;
 
                 // ⭐ PATCH 9A — Suppression states
@@ -1137,82 +1247,33 @@ namespace StoreRobberyEnhanced.Systems
                 if (IsClerkBusy(clerk))
                     return;
 
-                // ⭐ PATCH G — Clerk must be near register to continue stall
-                if (!IsClerkAtRegister(store, clerk))
-                {
-                    DebugLogger.Warn($"[PATCH G] Clerk displaced from register during ProcessStall. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH O — Player must remain inside store boundary
-                if (!PlayerInsideRobberyZone(store, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH O] Player left store boundary during {nameof(ProcessStall)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH I — Player must be threatening clerk (LOS + distance)
-                if (!PlayerThreatValid(store, clerk, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH I] Player not threatening clerk during {nameof(ProcessStall)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH J — Validate state machine integrity
-                if (!ValidateClerkStateMachine(store))
-                {
-                    DebugLogger.Warn($"[PATCH J] Invalid clerk state machine detected during {nameof(ProcessStall)}. Resetting to stall.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH R — LOS persistence enforcement
-                if (ClerkLostLOS(store, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH R] Player broke LOS during {nameof(ProcessStall)} at store {store.Id}. Pausing robbery.");
-
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    store.PendingCompletion = false;
-
-                    _ctx.Ui.ShowNotification("~r~You broke line of sight — robbery paused.");
-                    return;
-                }
-
                 // ------------------------------------------------------------
                 // STILL STALLING?
                 // ------------------------------------------------------------
                 if ((DateTime.UtcNow - store.StallStartUtc).TotalMilliseconds < store.StallDurationMs)
                 {
                     // Ensure nervous idle is playing
-                    if (!IsPlayingAnim(clerk, "missheist_agency2aig_2", "look_around_guard"))
+                    if (!IsPlayingAnim(clerk, "rcmme_tracey1", "nervous_loop"))
                     {
-                        Function.Call(Hash.REQUEST_ANIM_DICT, "missheist_agency2aig_2");
+                        Function.Call(Hash.REQUEST_ANIM_DICT, "rcmme_tracey1");
 
-                        if (Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "missheist_agency2aig_2"))
+                        if (Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "rcmme_tracey1"))
                         {
                             Function.Call(
                                 Hash.TASK_PLAY_ANIM,
                                 clerk.Handle,
-                                "missheist_agency2aig_2",
-                                "look_around_guard",
-                                4.0f,
-                                -4.0f,
-                                -1,
+                                "rcmme_tracey1",
+                                "nervous_loop",
+                                8.0f,
+                                -8.0f,
+                                7000,
                                 (int)AnimationFlags.Loop,
                                 0f,
                                 false, false, false
                             );
 
                             _ctx.Ui.ShowNotification("~y~The clerk is stalling...~s~ Wait for them to open the register.");
-                            DebugLogger.Info($"Clerk at store {store.Id} is stalling for {store.StallDurationMs} ms.");
+                            //DebugLogger.Info($"Clerk at store {store.Id} is stalling for {store.StallDurationMs} ms.");
                         }
                     }
 
@@ -1248,7 +1309,10 @@ namespace StoreRobberyEnhanced.Systems
                 store.ClerkAnimStartUtc = DateTime.UtcNow;
                 store.ClerkAnimDurationMs = 1800;
 
-                PlayAnimNative(clerk, "mp_am_hold_up", "purchase_beer_shopkeeper", AnimationFlags.None);
+                // ⭐ PATCH U — Lock phase
+                SetClerkPhase(store, ClerkPhase.RegisterOpening);
+
+                PlayAnimNative(clerk, "rcmme_tracey1", "nervous_loop", AnimationFlags.None);
             }
             catch (Exception ex)
             {
@@ -1257,7 +1321,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // REGISTER OPENING (PATCH 9B APPLIED + PATCH S)
+        // REGISTER OPENING (PATCH 9B APPLIED + PATCH S + PATCH U)
         // ------------------------------------------------------------
         private void ProcessRegisterOpening(TrackedStore store, Ped clerk)
         {
@@ -1268,10 +1332,6 @@ namespace StoreRobberyEnhanced.Systems
 
                 // ⭐ PATCH P — Ragdoll recovery
                 if (HandleClerkRagdoll(store))
-                    return;
-
-                // ⭐ PATCH Q — Position/heading validation
-                if (ValidateClerkPosition(store))
                     return;
 
                 // ⭐ PATCH 9B — Suppression states
@@ -1294,136 +1354,39 @@ namespace StoreRobberyEnhanced.Systems
                 if (clerk.IsDead || clerk.IsRagdoll || store.ClerkFleeing)
                     return;
 
-                // ⭐ PATCH S — Animation integrity enforcement
-                // Register opening uses "enter" from grab_cash dict
-                if (EnsureClerkAnimation(store, "anim@heists@ornate_bank@grab_cash", "enter"))
-                    return;
-
                 // ⭐ PATCH F — Prevent phase advancement while animations are still running
                 if (IsClerkBusy(clerk))
-                {
-                    // Do NOT advance phases while animation is active
                     return;
-                }
-
-                // ⭐ PATCH G — Clerk must be near register to continue this phase
-                if (!IsClerkAtRegister(store, clerk))
-                {
-                    DebugLogger.Warn($"[PATCH G] Clerk displaced from register during {nameof(ProcessRegisterOpening)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
 
                 // ------------------------------------------------------------
                 // STILL IN FIRST ANIMATION PHASE?
                 // ------------------------------------------------------------
                 if ((DateTime.UtcNow - store.ClerkAnimStartUtc).TotalMilliseconds < store.ClerkAnimDurationMs)
-                {
-                    // Prevent idle reset during transition
                     return;
-                }
-
-                // ⭐ PATCH H — Validate register actually opened
-                // Clerk must be at register
-                if (!IsClerkAtRegister(store, clerk))
-                {
-                    DebugLogger.Warn($"[PATCH H] Clerk displaced before register opened at store {store.Id}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // Clerk must be facing the register
-                Vector3 toRegister = (store.RegisterPos - clerk.Position).Normalized;
-                float dot = Vector3.Dot(clerk.ForwardVector, toRegister);
-                if (dot < 0.35f) // ~70° cone
-                {
-                    DebugLogger.Warn($"[PATCH H] Clerk not facing register after open animation at store {store.Id}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // Animation must have actually played
-                if (!IsPlayingAnim(clerk, "anim@heists@ornate_bank@grab_cash", "enter") &&
-                    !IsPlayingAnim(clerk, "mp_am_hold_up", "purchase_beer_shopkeeper"))
-                {
-                    DebugLogger.Warn($"[PATCH H] Register open animation never played at store {store.Id}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH O — Player must remain inside store boundary
-                if (!PlayerInsideRobberyZone(store, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH O] Player left store boundary during {nameof(ProcessRegisterOpening)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH I — Player must be threatening clerk (Silent + Loud)
-                if (!PlayerThreatValid(store, clerk, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH I] Player not threatening clerk during {nameof(ProcessRegisterOpening)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH J — Validate state machine integrity
-                if (!ValidateClerkStateMachine(store))
-                {
-                    DebugLogger.Warn($"[PATCH J] Invalid clerk state machine detected during {nameof(ProcessRegisterOpening)}. Resetting to stall.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH R — LOS persistence enforcement
-                if (ClerkLostLOS(store, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH R] Player broke LOS during {nameof(ProcessRegisterOpening)} at store {store.Id}. Pausing robbery.");
-
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    store.PendingCompletion = false;
-
-                    _ctx.Ui.ShowNotification("~r~You broke line of sight — robbery paused.");
-                    return;
-                }
 
                 // ------------------------------------------------------------
                 // FIRST PHASE: PLAY "ENTER" ANIMATION
                 // ------------------------------------------------------------
                 if (!store.ClerkGrabbingCash)
                 {
-                    store.ClerkOpeningRegister = false;
-                    store.ClerkStalling = false;
-                    store.ClerkThrowingBag = false;
-                    store.ClerkPanicking = false;
-                    store.ClerkFleeing = false;
-
-                    ClearAllClerkPhases(store);
-                    store.ClerkGrabbingCash = true;
+                    // ⭐ PATCH U — Transition to CashGrab
+                    SetClerkPhase(store, ClerkPhase.CashGrab);
 
                     // Safety: clear tasks only if clerk is stable
                     if (!clerk.IsRagdoll && !store.ClerkFleeing)
                         clerk.Task.ClearAllImmediately();
 
-                    // ⭐ PATCH B — Animation Failure Fallback System
-                    if (SafeLoadAnimDict("anim@heists@ornate_bank@grab_cash"))
+                    // ⭐ PATCH B — Animation Failure Fallback
+                    if (SafeLoadAnimDict("oddjobs@shop_robbery@rob_till"))
                     {
                         Function.Call(
                             Hash.TASK_PLAY_ANIM,
                             clerk.Handle,
-                            "anim@heists@ornate_bank@grab_cash",
+                            "oddjobs@shop_robbery@rob_till",
                             "enter",
-                            8.0f, -8.0f,
-                            1500,
-                            (int)AnimationFlags.None,
+                            4.0f, -4.0f,
+                            1000,
+                            (int)AnimationFlags.Loop,
                             0f,
                             false, false, false
                         );
@@ -1433,19 +1396,11 @@ namespace StoreRobberyEnhanced.Systems
                     }
                     else
                     {
-                        DebugLogger.Warn($"[PATCH B] Animation dict failed to load for store {store.Id}. Halting robbery phase.");
-
-                        ClearAllClerkPhases(store);
-                        store.ClerkStalling = true;
-                        store.ClerkOpeningRegister = false;
-                        store.ClerkGrabbingCash = false;
-                        store.ClerkThrowingBag = false;
-
-                        _ctx.Ui.ShowNotification("~r~Clerk froze — animation failed. Robbery paused safely.");
+                        DebugLogger.Warn($"[PATCH B] Animation dict failed to load for store {store.Id}. Halting robbery phase.");
+                        SetClerkPhase(store, ClerkPhase.Stall);
                         return;
                     }
 
-                    // Set timer for next phase
                     store.ClerkAnimStartUtc = DateTime.UtcNow;
                     store.ClerkAnimDurationMs = 1500;
                     return;
@@ -1454,19 +1409,18 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 // SECOND PHASE: IDLE AT OPEN REGISTER
                 // ------------------------------------------------------------
-                store.ClerkGrabbingCash = false;
-                store.ClerkThrowingBag = true;
+                SetClerkPhase(store, ClerkPhase.BagToss);
 
                 if (!clerk.IsRagdoll && !store.ClerkFleeing)
                 {
                     Function.Call(
                         Hash.TASK_PLAY_ANIM,
                         clerk.Handle,
-                        "anim@heists@ornate_bank@grab_cash",
-                        "idle",
-                        8.0f,
-                        -8.0f,
-                        -1,
+                        "oddjobs@shop_robbery@rob_till",
+                        "exit",
+                        4.0f,
+                        -4.0f,
+                        1000,
                         (int)AnimationFlags.Loop,
                         0f,
                         false, false, false
@@ -1480,7 +1434,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // CASH GRAB (PATCH 9C APPLIED)
+        // CASH GRAB (PATCH 9C APPLIED + PATCH U + PATCH S)
         // ------------------------------------------------------------
         private void ProcessCashGrab(TrackedStore store, Ped clerk)
         {
@@ -1491,10 +1445,6 @@ namespace StoreRobberyEnhanced.Systems
 
                 // ⭐ PATCH P — Ragdoll recovery
                 if (HandleClerkRagdoll(store))
-                    return;
-
-                // ⭐ PATCH Q — Position/heading validation
-                if (ValidateClerkPosition(store))
                     return;
 
                 // ⭐ PATCH 9C — Suppression states
@@ -1517,65 +1467,9 @@ namespace StoreRobberyEnhanced.Systems
                 if (clerk.IsDead || clerk.IsRagdoll || store.ClerkFleeing)
                     return;
 
-                // ⭐ PATCH S — Animation integrity enforcement
-                if (EnsureClerkAnimation(store, "mp_common", "givetake1_a"))
-                    return;
-
                 // ⭐ PATCH F — Prevent phase advancement while animations are still running
                 if (IsClerkBusy(clerk))
-                {
-                    // Do NOT advance phases while animation is active
                     return;
-                }
-
-                // ⭐ PATCH G — Clerk must be near register to continue this phase
-                if (!IsClerkAtRegister(store, clerk))
-                {
-                    DebugLogger.Warn($"[PATCH G] Clerk displaced from register during {nameof(ProcessCashGrab)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH O — Player must remain inside store boundary
-                if (!PlayerInsideRobberyZone(store, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH O] Player left store boundary during {nameof(ProcessCashGrab)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH I — Player must be threatening clerk (LOS + distance)
-                if (!PlayerThreatValid(store, clerk, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH I] Player not threatening clerk during {nameof(ProcessCashGrab)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH J — Validate state machine integrity
-                if (!ValidateClerkStateMachine(store))
-                {
-                    DebugLogger.Warn($"[PATCH J] Invalid clerk state machine detected during {nameof(ProcessCashGrab)}. Resetting to stall.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH R — LOS persistence enforcement
-                if (ClerkLostLOS(store, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH R] Player broke LOS during {nameof(ProcessCashGrab)} at store {store.Id}. Pausing robbery.");
-
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    store.PendingCompletion = false;
-
-                    _ctx.Ui.ShowNotification("~r~You broke line of sight — robbery paused.");
-                    return;
-                }
 
                 // ------------------------------------------------------------
                 // STILL IN PREVIOUS PHASE?
@@ -1583,17 +1477,6 @@ namespace StoreRobberyEnhanced.Systems
                 if ((DateTime.UtcNow - store.ClerkAnimStartUtc).TotalMilliseconds < store.ClerkAnimDurationMs)
                     return;
                 
-                // ------------------------------------------------------------
-                // TRANSITION TO BAG TOSS PHASE
-                // ------------------------------------------------------------
-                store.ClerkGrabbingCash = false;
-                store.ClerkOpeningRegister = false;
-                store.ClerkStalling = false;
-                store.ClerkPanicking = false;
-                store.ClerkFleeing = false;
-                ClearAllClerkPhases(store);
-                store.ClerkThrowingBag = true;
-
                 // Safety: only clear tasks if clerk is stable
                 if (!clerk.IsRagdoll && !store.ClerkFleeing)
                     clerk.Task.ClearAllImmediately();
@@ -1601,19 +1484,19 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 // LOAD ANIM DICT
                 // ------------------------------------------------------------
-                Function.Call(Hash.REQUEST_ANIM_DICT, "mp_common");
+                Function.Call(Hash.REQUEST_ANIM_DICT, "oddjobs@shop_robbery@rob_till");
 
-                if (Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "mp_common"))
+                if (Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "oddjobs@shop_robbery@rob_till"))
                 {
                     // Play the give-money animation
                     Function.Call(
                         Hash.TASK_PLAY_ANIM,
                         clerk.Handle,
-                        "mp_common",
-                        "givetake1_a",
+                        "oddjobs@shop_robbery@rob_till",
+                        "loop",
                         8.0f,
                         -8.0f,
-                        1500,
+                        8000,
                         (int)AnimationFlags.None,
                         0f,
                         false, false, false
@@ -1624,18 +1507,10 @@ namespace StoreRobberyEnhanced.Systems
                 }
                 else
                 {
-                    DebugLogger.Warn($"[PATCH B] Animation dict failed to load for store {store.Id}. Halting robbery phase.");
+                    DebugLogger.Warn($"[PATCH B] Animation dict failed to load for store {store.Id}. Halting robbery phase.");
 
-                    // Halt progression safely
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;           // revert to stall phase
-                    store.ClerkOpeningRegister = false;
-                    store.ClerkGrabbingCash = false;
-                    store.ClerkThrowingBag = false;
-
-                    // Notify player
-                    _ctx.Ui.ShowNotification("~r~Clerk froze — animation failed. Robbery paused safely.");
-                    return; // stop phase advancement
+                    SetClerkPhase(store, ClerkPhase.Stall);
+                    return;
                 }
 
                 // ------------------------------------------------------------
@@ -1651,6 +1526,12 @@ namespace StoreRobberyEnhanced.Systems
                 payout = (int)(payout * _ctx.Config.PayoutMultiplier);
 
                 store.PendingPayout += payout;
+
+                // ------------------------------------------------------------
+                // ⭐ PATCH U — Transition to Bag Toss Phase
+                // ------------------------------------------------------------
+                SetClerkPhase(store, ClerkPhase.BagToss);
+
             }
             catch (Exception ex)
             {
@@ -1659,7 +1540,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // BAG TOSS (PATCH D — Safe Bag Toss Logic + PATCH S)
+        // BAG TOSS (PATCH D — Safe Bag Toss Logic + PATCH S + PATCH U)
         // ------------------------------------------------------------
         private void ProcessBagToss(TrackedStore store, Ped clerk)
         {
@@ -1670,10 +1551,6 @@ namespace StoreRobberyEnhanced.Systems
 
                 // ⭐ PATCH P — Ragdoll recovery
                 if (HandleClerkRagdoll(store))
-                    return;
-
-                // ⭐ PATCH Q — Position/heading validation
-                if (ValidateClerkPosition(store))
                     return;
 
                 // ⭐ PATCH D — Suppression states
@@ -1696,75 +1573,9 @@ namespace StoreRobberyEnhanced.Systems
                 if (clerk.IsDead || clerk.IsRagdoll || store.ClerkFleeing)
                     return;
 
-                // ⭐ PATCH S — Animation integrity enforcement (Bag Toss)
-                // Ensures "givetake2_a" cannot be cancelled
-                if (EnsureClerkAnimation(store, "mp_common", "givetake2_a"))
-                    return;
-
                 // ⭐ PATCH F — Prevent phase advancement while animations are still running
                 if (IsClerkBusy(clerk))
                     return;
-
-                // ⭐ PATCH D — Ensure clerk is at the register
-                float distToRegister = clerk.Position.DistanceTo(store.RegisterPos);
-                if (distToRegister > 1.25f)
-                {
-                    DebugLogger.Warn($"[PATCH D] Clerk too far from register for bag toss (dist={distToRegister}). Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH D — Ensure clerk is facing the register
-                Vector3 toRegister = (store.RegisterPos - clerk.Position).Normalized;
-                float dot = Vector3.Dot(clerk.ForwardVector, toRegister);
-                if (dot < 0.35f)
-                {
-                    DebugLogger.Warn($"[PATCH D] Clerk not facing register for bag toss. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH O — Player must remain inside store boundary
-                if (!PlayerInsideRobberyZone(store, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH O] Player left store boundary during {nameof(ProcessBagToss)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH I — Player must be threatening clerk
-                if (!PlayerThreatValid(store, clerk, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH I] Player not threatening clerk during {nameof(ProcessBagToss)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH J — Validate state machine integrity
-                if (!ValidateClerkStateMachine(store))
-                {
-                    DebugLogger.Warn($"[PATCH J] Invalid clerk state machine detected during {nameof(ProcessBagToss)}. Resetting to stall.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH R — LOS persistence enforcement
-                if (ClerkLostLOS(store, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH R] Player broke LOS during {nameof(ProcessBagToss)} at store {store.Id}. Pausing robbery.");
-
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    store.PendingCompletion = false;
-
-                    _ctx.Ui.ShowNotification("~r~You broke line of sight — robbery paused.");
-                    return;
-                }
 
                 // ⭐ Wait for previous animation to finish
                 if ((DateTime.UtcNow - store.ClerkAnimStartUtc).TotalMilliseconds < store.ClerkAnimDurationMs)
@@ -1775,24 +1586,8 @@ namespace StoreRobberyEnhanced.Systems
                     clerk.Task.ClearAllImmediately();
 
                 // ------------------------------------------------------------
-                // ⭐ PATCH D — Load anim dict safely
-                // ------------------------------------------------------------
-                Function.Call(Hash.REQUEST_ANIM_DICT, "mp_common");
-
-                if (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "mp_common"))
-                {
-                    DebugLogger.Warn($"[PATCH D] Bag toss anim dict failed to load for store {store.Id}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ------------------------------------------------------------
                 // PLAY BAG TOSS ANIMATION
                 // ------------------------------------------------------------
-                ClearAllClerkPhases(store);
-                store.ClerkThrowingBag = true;
-
                 if (SafeLoadAnimDict("mp_common"))
                 {
                     clerk.Task.ClearAllImmediately();
@@ -1802,8 +1597,8 @@ namespace StoreRobberyEnhanced.Systems
                         clerk.Handle,
                         "mp_common",
                         "givetake2_a",   // ⭐ Bag toss animation
-                        8.0f, -8.0f,
-                        1200,
+                        4.0f, -4.0f,
+                        1000,
                         (int)AnimationFlags.None,
                         0f,
                         false, false, false
@@ -1815,31 +1610,32 @@ namespace StoreRobberyEnhanced.Systems
                 else
                 {
                     DebugLogger.Warn($"[PATCH B] Animation dict failed to load for store {store.Id}. Halting bag toss.");
-
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
+                    SetClerkPhase(store, ClerkPhase.Stall);
                     return;
                 }
+                
+                // ------------------------------------------------------------
+                // ⭐ PATCH U — Transition to Surrended Phase
+                // ------------------------------------------------------------
+                SetClerkPhase(store, ClerkPhase.Surrender);
+                store.ClerkSurrenderStage = 0;
+                store.ClerkFleeing = true;
+                store.ClerkSurrender = true;
+                DebugLogger.Info($"Store Surrender State {store.ClerkSurrenderStage} and clerk flee status {store.ClerkFleeing}.");
 
+                // Set timer for next phase
+                //store.ClerkAnimStartUtc = DateTime.UtcNow;
+                //store.ClerkAnimDurationMs = 1200;
+                
                 // ------------------------------------------------------------
                 // ⭐ PATCH D — Only spawn bag AFTER animation starts
                 // ------------------------------------------------------------
                 _ctx.Robberies.SpawnLootBag(store, clerk);
 
-                // ------------------------------------------------------------
-                // TRANSITION TO SURRENDER SEQUENCE
-                // ------------------------------------------------------------
-                store.ClerkPanicking = false;
-                store.ClerkFleeing = true;
-                store.ClerkSurrenderStage = 0;
-
-                // Set timer for next phase
-                store.ClerkAnimStartUtc = DateTime.UtcNow;
-                store.ClerkAnimDurationMs = 1200;
             }
             catch (Exception ex)
             {
-                DebugLogger.LogException("ClerkSystem.ProcessBagToss (PATCH D)", ex);
+                DebugLogger.LogException("ClerkSystem.ProcessBagToss (PATCH D + PATCH U)", ex);
             }
         }
 
@@ -1855,10 +1651,6 @@ namespace StoreRobberyEnhanced.Systems
 
                 // ⭐ PATCH P — Ragdoll recovery
                 if (HandleClerkRagdoll(store))
-                    return;
-
-                // ⭐ PATCH Q — Position/heading validation
-                if (ValidateClerkPosition(store))
                     return;
 
                 // ⭐ PATCH 9E — Suppression states
@@ -1888,56 +1680,6 @@ namespace StoreRobberyEnhanced.Systems
                     return;
                 }
 
-                // ⭐ PATCH G — Clerk must be near register to continue this phase
-                if (!IsClerkAtRegister(store, clerk))
-                {
-                    DebugLogger.Warn($"[PATCH G] Clerk displaced from register during {nameof(ProcessPanic)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH O — Player must remain inside store boundary
-                if (!PlayerInsideRobberyZone(store, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH O] Player left store boundary during {nameof(ProcessPanic)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-
-                // ⭐ PATCH I — Player must be threatening clerk (LOS + distance)
-                if (!PlayerThreatValid(store, clerk, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH I] Player not threatening clerk during {nameof(ProcessPanic)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH J — Validate state machine integrity
-                if (!ValidateClerkStateMachine(store))
-                {
-                    DebugLogger.Warn($"[PATCH J] Invalid clerk state machine detected during {nameof(ProcessPanic)}. Resetting to stall.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH R — LOS persistence enforcement
-                if (ClerkLostLOS(store, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH R] Player broke LOS during {nameof(ProcessPanic)} at store {store.Id}. Pausing robbery.");
-
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    store.PendingCompletion = false;
-
-                    _ctx.Ui.ShowNotification("~r~You broke line of sight — robbery paused.");
-                    return;
-                }
-
                 // ⭐ Simple cower behavior (safe)
                 if (!clerk.IsInCombat && !clerk.IsFleeing)
                 {
@@ -1954,7 +1696,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // FLEE / SURRENDER OVERRIDE (PATCH 9E APPLIED)
+        // FLEE / SURRENDER OVERRIDE (PATCH 9E APPLIED + PATCH U)
         // ------------------------------------------------------------
         private void ProcessFlee(TrackedStore store, Ped clerk)
         {
@@ -1963,101 +1705,51 @@ namespace StoreRobberyEnhanced.Systems
                 if (store == null || clerk == null || !clerk.Exists())
                     return;
 
-                // ⭐ PATCH P — Ragdoll recovery
-                if (HandleClerkRagdoll(store))
-                    return;
+                //// ⭐ PATCH P — Ragdoll recovery
+                //if (HandleClerkRagdoll(store))
+                //    return;
 
-                // ⭐ PATCH Q — Position/heading validation
-                if (ValidateClerkPosition(store))
-                    return;
+                //// ⭐ PATCH 9E — Suppression states
+                //if (_ctx.Police.SuppressPoliceForDebug)
+                //    return;
 
-                // ⭐ PATCH 9E — Suppression states
-                if (_ctx.Police.SuppressPoliceForDebug)
-                    return;
+                //if (store.RobberyEnded)
+                //    return;
 
-                if (store.RobberyEnded)
-                    return;
+                //if (store.CooldownActive)
+                //    return;
 
-                if (store.CooldownActive)
-                    return;
+                //if (store.SilentRobbery)
+                //    return;
 
-                if (store.SilentRobbery)
-                    return;
-
-                if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
-                    return;
+                //if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
+                //    return;
 
                 // ⭐ PATCH F — Prevent phase advancement while animations are still running
-                if (IsClerkBusy(clerk))
-                {
-                    // Do NOT advance phases while animation is active
-                    return;
-                }
-
-                // ⭐ PATCH G — Clerk must be near register to continue this phase
-                if (!IsClerkAtRegister(store, clerk))
-                {
-                    DebugLogger.Warn($"[PATCH G] Clerk displaced from register during {nameof(ProcessFlee)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH O — Player must remain inside store boundary
-                if (!PlayerInsideRobberyZone(store, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH O] Player left store boundary during {nameof(ProcessFlee)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH I — Player must be threatening clerk (LOS + distance)
-                if (!PlayerThreatValid(store, clerk, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH I] Player not threatening clerk during {nameof(ProcessFlee)}. Halting phase.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH J — Validate state machine integrity
-                if (!ValidateClerkStateMachine(store))
-                {
-                    DebugLogger.Warn($"[PATCH J] Invalid clerk state machine detected during {nameof(ProcessFlee)}. Resetting to stall.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH R — LOS persistence enforcement
-                if (ClerkLostLOS(store, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH R] Player broke LOS during {nameof(ProcessFlee)} at store {store.Id}. Pausing robbery.");
-
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    store.PendingCompletion = false;
-
-                    _ctx.Ui.ShowNotification("~r~You broke line of sight — robbery paused.");
-                    return;
-                }
+                //if (IsClerkBusy(clerk))
+                //    return;
 
                 // ⭐ Fleeing is disabled — clerks surrender instead
                 store.ClerkFleeing = false;
 
+                // ⭐ PATCH U — Transition to Surrender Phase
                 if (store.ClerkSurrenderStage == 0)
                 {
+                    //SetClerkPhase(store, ClerkPhase.Surrender);
+                    DebugLogger.Info($"Clerk at store {store.Id} is about to surrender");
                     StartClerkSurrender(store, clerk);
                 }
                 else
                 {
+                    //SetClerkPhase(store, ClerkPhase.Surrender);
                     UpdateClerkSurrender(store, clerk);
+                    store.ClerkSurrender = false;
+                    DebugLogger.Info($"Clerk at store {store.Id} is starting to surrender.");
                 }
             }
             catch (Exception ex)
             {
-                DebugLogger.LogException("ClerkSystem.ProcessFlee", ex);
+                DebugLogger.LogException("ClerkSystem.ProcessFlee (PATCH 9E + PATCH U)", ex);
             }
         }
 
@@ -2075,44 +1767,6 @@ namespace StoreRobberyEnhanced.Systems
                 if (clerk.IsDead || clerk.IsRagdoll)
                     return;
 
-                // ⭐ PATCH L — Validate state machine
-                if (!ValidateClerkStateMachine(store))
-                {
-                    DebugLogger.Warn($"[PATCH L] Invalid state machine at surrender start. Resetting.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH L — Player must be threatening
-                if (!PlayerThreatValid(store, clerk, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH L] Player not threatening at surrender start. Resetting.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH L — Clerk must be at register
-                if (!IsClerkAtRegister(store, clerk))
-                {
-                    DebugLogger.Warn($"[PATCH L] Clerk displaced at surrender start. Resetting.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH L — Clerk must face player
-                Vector3 toPlayer = (Game.Player.Character.Position - clerk.Position).Normalized;
-                float dot = Vector3.Dot(clerk.ForwardVector, toPlayer);
-                if (dot < 0.25f)
-                {
-                    DebugLogger.Warn($"[PATCH L] Clerk not facing player at surrender start. Resetting.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
                 // ⭐ PATCH L — Prevent animation overlap
                 if (IsClerkBusy(clerk))
                     return;
@@ -2120,7 +1774,8 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ Begin surrender
                 ClearAllClerkPhases(store);
                 store.ClerkFleeing = true;
-                store.ClerkSurrenderStage = 1;
+                store.ClerkSurrenderStage = 2;
+                store.ClerkSurrender = true;
 
                 clerk.Task.ClearAllImmediately();
                 clerk.Task.HandsUp(-1);
@@ -2134,7 +1789,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // UPDATE CLERK SURRENDER (PATCH L — Finalized + PATCH S)
+        // UPDATE CLERK SURRENDER (PATCH L — Finalized + PATCH S + PATCH U)
         // ------------------------------------------------------------
         private void UpdateClerkSurrender(TrackedStore store, Ped clerk)
         {
@@ -2142,6 +1797,9 @@ namespace StoreRobberyEnhanced.Systems
             {
                 if (store == null || clerk == null || !clerk.Exists())
                     return;
+               
+                // ⭐ PATCH U — Lock phase
+                SetClerkPhase(store, ClerkPhase.Surrender);
 
                 // ⭐ Clerk must be stable
                 if (clerk.IsDead || clerk.IsRagdoll)
@@ -2150,55 +1808,10 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ PATCH P — Ragdoll recovery
                 if (HandleClerkRagdoll(store))
                     return;
-
-                // ⭐ PATCH Q — Position/heading validation
-                if (ValidateClerkPosition(store))
-                    return;
-
-                // ⭐ PATCH L — Validate state machine
-                if (!ValidateClerkStateMachine(store))
-                {
-                    DebugLogger.Warn($"[PATCH L] Invalid state machine during surrender. Resetting.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH L — Player must be threatening
-                if (!PlayerThreatValid(store, clerk, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH L] Player not threatening during surrender. Resetting.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH L — Clerk must be at register
-                if (!IsClerkAtRegister(store, clerk))
-                {
-                    DebugLogger.Warn($"[PATCH L] Clerk displaced during surrender. Resetting.");
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    return;
-                }
-
-                // ⭐ PATCH R — LOS persistence enforcement
-                if (ClerkLostLOS(store, Game.Player.Character))
-                {
-                    DebugLogger.Warn($"[PATCH R] Player broke LOS during {nameof(UpdateClerkSurrender)} at store {store.Id}. Pausing robbery.");
-
-                    ClearAllClerkPhases(store);
-                    store.ClerkStalling = true;
-                    store.PendingCompletion = false;
-
-                    _ctx.Ui.ShowNotification("~r~You broke line of sight — robbery paused.");
-                    return;
-                }
-
+               
                 // ⭐ PATCH S — Animation integrity enforcement (HandsUp must persist)
                 if (store.ClerkSurrenderStage >= 2) // hands-up or final idle
                 {
-                    // Check if clerk is still playing the hands-up animation
                     bool handsUpActive = Function.Call<bool>(
                         Hash.IS_ENTITY_PLAYING_ANIM,
                         clerk.Handle,
@@ -2254,7 +1867,7 @@ namespace StoreRobberyEnhanced.Systems
             }
             catch (Exception ex)
             {
-                DebugLogger.LogException("UpdateClerkSurrender (PATCH L)", ex);
+                DebugLogger.LogException("UpdateClerkSurrender (PATCH L + PATCH U)", ex);
             }
         }
 

@@ -1,8 +1,9 @@
-﻿using System;
-using System.Collections.Generic;
-using GTA;
+﻿using GTA;
 using GTA.Math;
 using StoreRobberyEnhanced.Minigame;
+using System;
+using System.Collections.Generic;
+using static StoreRobberyEnhanced.Systems.ClerkSystem;
 
 namespace StoreRobberyEnhanced.Data
 {
@@ -36,6 +37,7 @@ namespace StoreRobberyEnhanced.Data
         public bool ClerkThrowingBag;
         public bool ClerkPanicking;
         public bool ClerkFleeing;
+        public bool ClerkSurrender;
         public DateTime ClerkAnimStartUtc;
         public int ClerkAnimDurationMs;
         public bool GreetedPlayer = false;
@@ -126,6 +128,7 @@ namespace StoreRobberyEnhanced.Data
         public bool ClerkDeathHandledCheck { get; set; }
         public bool ClerkKilledWithGun;
         public bool SilentRobbery;
+        public ClerkPhase CurrentPhase = ClerkPhase.None;
 
         // Alarm / police
         public bool AlarmTriggered;

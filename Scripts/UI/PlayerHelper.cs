@@ -345,24 +345,47 @@ namespace StoreRobberyEnhanced.UI
             }
         }
 
-        public bool IsInsideStore(TrackedStore store, float radius)
+        // ------------------------------------------------------------
+        // IS INSIDE STORE (NULL-SAFE + PATCH U + PATCH O COMPATIBLE)
+        // ------------------------------------------------------------
+        public bool IsInsideStore(TrackedStore store, float radiusOverride = -1f)
         {
             try
             {
+                // ⭐ Absolute safety: store missing
+                if (store == null)
+                    return false;
+
+                // ⭐ Store must be initialized
+                if (store.StorePos == Vector3.Zero ||
+                    store.RegisterPos == Vector3.Zero)
+                    return false;
+
+                // ⭐ Determine radius
+                float radius = radiusOverride > 0f ? radiusOverride : store.Radius;
+
+                // ⭐ Radius must be valid
+                if (radius <= 0f || radius > 200f) // sanity check
+                    return false;
+
+                // ⭐ Player must exist
                 Ped player = Game.Player.Character;
                 if (player == null || !player.Exists())
                     return false;
 
-                bool result = player.Position.DistanceTo(store.StorePos) <= radius;
-                DebugLogger.Trace($"IsInsideStore(store={store.Id}, radius={radius}) = {result}");
-                return result;
+                // ⭐ Distance check
+                float dist = player.Position.DistanceTo(store.StorePos);
+
+                // ⭐ Final inside check
+                return dist <= radius;
             }
             catch (Exception ex)
             {
-                DebugLogger.LogException("PlayerHelper.IsInsideStore", ex);
-                return false;
+                DebugLogger.LogException("IsInsideStore (Patched)", ex);
+                return false; // fail-safe
             }
         }
+
 
         // ------------------------------------------------------------
         // LINE OF SIGHT
