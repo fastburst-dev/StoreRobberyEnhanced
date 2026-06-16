@@ -363,6 +363,7 @@ StoreRobberyTracker/
 │   ├── Systems/
 │   │   ├── BlipSystem.cs
 │   │   ├── CameraSystem.cs
+│   │   ├── ClerkHelperSystem.cs
 │   │   ├── ClerkReplacementSystem.cs
 │   │   ├── ClerkSystem.cs
 │   │   ├── CooldownSystem.cs
