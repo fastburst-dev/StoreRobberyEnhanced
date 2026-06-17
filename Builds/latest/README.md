@@ -1,5 +1,5 @@
 Store Robbery Enhanced — Latest Build
-Version: v2.6.8.2 (Latest release)
+Version: v2.6.9.7 (Latest release)
 
 Thank you for downloading the latest build of Store Robbery Enhanced.
 This mod brings the GTA Online store robbery achievement experience into
