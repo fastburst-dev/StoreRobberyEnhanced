@@ -314,33 +314,6 @@ namespace StoreRobberyEnhanced.Systems
                     }
                 }
 
-                //if (!store.ClerkReacted)
-                //{
-                //    Weapon weapon = player.Weapons.Current;
-                //    bool isGun =
-                //        weapon != null &&
-                //        weapon.Hash != WeaponHash.Unarmed &&
-                //        weapon.Group != WeaponGroup.Melee;
-
-                //    if (isGun)
-                //    {
-                //        bool aiming = Game.IsControlPressed(Control.Aim);
-
-                //        bool los = Function.Call<bool>(
-                //            Hash.HAS_ENTITY_CLEAR_LOS_TO_ENTITY,
-                //            clerk.Handle,
-                //            player.Handle,
-                //            17
-                //        );
-
-                //        if (aiming && los && IsThreateningSoft(player, clerk))
-                //        {
-                //            BeginFearReaction(store, clerk);
-                //            return;
-                //        }
-                //    }
-                //}
-
                 // ------------------------------------------------------------
                 // REMAINING BEHAVIOR
                 // ------------------------------------------------------------
@@ -598,8 +571,8 @@ namespace StoreRobberyEnhanced.Systems
                 }
                 else
                 {
-                    // Loud robbery threat radius
-                    if (dist > 8.0f)
+                    // Loud robbery threat radius (doorway-friendly)
+                    if (dist > 20.0f)
                         return false;
                 }
 
@@ -608,12 +581,19 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 if (!store.SilentRobbery)
                 {
-                    bool los = false;
+                    // ⭐ For loud robberies, LOS is *informational* only.
+                    // Glass/doorframes often break HAS_ENTITY_CLEAR_LOS_TO_ENTITY at the door.
+                    bool los = true;
                     try { los = ph.IsInLOS(clerk); }
-                    catch { return false; }
+                    catch { los = true; }
 
-                    if (!los)
-                        return false;
+                    DebugLogger.Trace($"PlayerThreatValid: loud, dist={dist:F1}, los={los}");
+                    // ❌ Do NOT early-return on !los for loud mode.
+                    // We want aiming from the doorway to always count as a threat.
+                }
+                else
+                {
+                    // Silent robbery can still be strict if you want LOS here later.
                 }
 
                 // ------------------------------------------------------------
@@ -1144,7 +1124,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 // 🎲 Random chance to fight back (10–20% typical)
                 int roll = _rng.Next(0, 100);
-                if (roll < 15) // 15% chance to fight
+                if (roll < 30) // 30% chance to fight
                 {
                     // Pick weapon type randomly
                     bool useShotgun = _rng.Next(0, 2) == 0;
@@ -1164,7 +1144,8 @@ namespace StoreRobberyEnhanced.Systems
                     store.ReactionType = ClerkReactionType.NormalPanic;
 
                 // Stall
-                store.ClerkStalling = true;
+                if (store.ReactionType == ClerkReactionType.NormalPanic)
+                    store.ClerkStalling = true;
                 store.StallStartUtc = DateTime.UtcNow;
                 store.StallDurationMs = _rng.Next(3000, 7000);
 
@@ -1175,8 +1156,7 @@ namespace StoreRobberyEnhanced.Systems
             {
                 DebugLogger.LogException("ClerkSystem.BeginFearReaction", ex);
             }
-        }
-        
+        }        
 
         // ------------------------------------------------------------
         // STALL PROCESSING (PATCH 9A + PATCH F + PATCH G APPLIED)
@@ -1471,8 +1451,8 @@ namespace StoreRobberyEnhanced.Systems
                         "loop",
                         8.0f,
                         -8.0f,
-                        8000,
-                        16 | 32,
+                        10000,
+                        1 | 2,
                         0f,
                         false, false, false
                     );
@@ -1494,7 +1474,7 @@ namespace StoreRobberyEnhanced.Systems
                 // SET TIMING FOR NEXT PHASE
                 // ------------------------------------------------------------
                 store.ClerkAnimStartUtc = DateTime.UtcNow;
-                store.ClerkAnimDurationMs = 1500;
+                store.ClerkAnimDurationMs = 9000;
 
                 // ------------------------------------------------------------
                 // PATCH 9C — SAFE PAYOUT (ONE-SHOT)
@@ -1603,7 +1583,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 // Set timer for next phase
                 store.ClerkAnimStartUtc = DateTime.UtcNow;
-                store.ClerkAnimDurationMs = 1200;
+                store.ClerkAnimDurationMs = 2000;
 
                 // ------------------------------------------------------------
                 // ⭐ PATCH D — Only spawn bag AFTER animation starts
@@ -1892,7 +1872,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // FIGHT OR FLIGHT PISTOL / SHOTGUN (PATCH 9F APPLIED)
+        // FIGHT OR FLIGHT PISTOL / SHOTGUN (PATCH 9F+DISTANCE APPLIED)
         // ------------------------------------------------------------
         private void ProcessFeelingFroggy(TrackedStore store, Ped clerk)
         {
@@ -1929,26 +1909,47 @@ namespace StoreRobberyEnhanced.Systems
                 if (player == null || !player.Exists())
                     return;
 
-                // ⭐ Must have LOS to player
+                // ⭐ Distance gate — allow reaction from doorway
+                float dist = clerk.Position.DistanceTo(player.Position);
+                if (dist > 22.5f) // try 20–25f for door-range
+                    return;
+
+                // ⭐ LOS — relax this, door/glass often blocks flag 17
                 bool los = Function.Call<bool>(
                     Hash.HAS_ENTITY_CLEAR_LOS_TO_ENTITY,
                     clerk.Handle,
                     player.Handle,
-                    17
+                    1 // more permissive than 17
                 );
-                if (!los)
-                    return;
+                // If this is still too strict, temporarily comment this out to confirm:
+                // if (!los)
+                //     return;
 
-                // ⭐ Must be facing player (prevents 180° instant snap)
+                // ⭐ Facing — only block if really turned away
                 Vector3 toPlayer = (player.Position - clerk.Position).Normalized;
                 float dot = Vector3.Dot(clerk.ForwardVector, toPlayer);
-                if (dot < 0.25f) // ~75° cone
+                if (dot < -0.25f) // only reject if facing > ~105° away
                     return;
 
                 // ⭐ Must not be in another phase
                 if (store.ClerkStalling || store.ClerkOpeningRegister || store.ClerkGrabbingCash || store.ClerkThrowingBag || store.ClerkPanicking)
                     return;
 
+                // ⭐ Force clerk into combat-ready state
+                clerk.BlockPermanentEvents = false;
+                clerk.AlwaysKeepTask = false;
+                clerk.IsPositionFrozen = false;
+
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 46, true); // Always fight
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 5, true);  // Can fight armed
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 1, true);  // Use cover
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 3, true);  // Aggressive
+                Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, clerk.Handle, 0, false);   // Disable flee
+                Function.Call(Hash.SET_PED_COMBAT_ABILITY, clerk.Handle, 2);           // Professional
+                Function.Call(Hash.SET_PED_COMBAT_MOVEMENT, clerk.Handle, 2);          // Offensive
+                Function.Call(Hash.SET_PED_COMBAT_RANGE, clerk.Handle, 2);             // Far range
+
+                _ctx.Ui.ShowSubtitle("~r~The clerk is fighting back!~s~ Watch out, they are armed!~n~The robbery is a complete bust, get out of there while you still can!", 4000);
                 // ------------------------------------------------------------
                 // ⭐ FIGHT BACK
                 // ------------------------------------------------------------
@@ -1956,12 +1957,24 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     case ClerkReactionType.FightPistol:
                         clerk.Weapons.Give(WeaponHash.Pistol, 60, true, true);
+                        clerk.Task.ClearAllImmediately();
+                        Script.Wait(50);
+                        clerk.Task.FightAgainst(player);
                         clerk.Task.Combat(player);
+                        // ⭐ Speech AFTER combat assignment
+                        Script.Wait(150); // small buffer so animation doesn’t cancel speech
+                        SafePlaySpeech(clerk, _speech.Get("Fight"), "SPEECH_PARAMS_FORCE");
                         break;
 
                     case ClerkReactionType.FightShotgun:
                         clerk.Weapons.Give(WeaponHash.PumpShotgun, 20, true, true);
+                        clerk.Task.ClearAllImmediately();
+                        Script.Wait(50);
+                        clerk.Task.FightAgainst(player);
                         clerk.Task.Combat(player);
+                        // ⭐ Speech AFTER combat assignment
+                        Script.Wait(150); // small buffer so animation doesn’t cancel speech
+                        SafePlaySpeech(clerk, _speech.Get("Fight"), "SPEECH_PARAMS_FORCE");
                         break;
                 }
             }

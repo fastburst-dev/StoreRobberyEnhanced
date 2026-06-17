@@ -148,7 +148,7 @@ namespace StoreRobberyEnhanced
                     {
                         if (store.IsRobberyActive || store.IsRobbed)
                         {
-                            DebugLogger.Info($"[DeathReset] Resetting store {store.Id}");
+                            //DebugLogger.Info($"[DeathReset] Resetting store {store.Id}");
 
                             // Hard stop all robbery state
                             store.IsRobberyActive = false;
@@ -198,7 +198,7 @@ namespace StoreRobberyEnhanced
                     if (_ctx.Stalker != null)
                         _ctx.Stalker.ResetAfterDeath();
 
-                    DebugLogger.Info("[DeathReset] Global robbery state cleared");
+                    // DebugLogger.Info("[DeathReset] Global robbery state cleared");
                 }
 
                 // ============================================================

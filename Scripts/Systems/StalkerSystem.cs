@@ -475,12 +475,12 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     if (_ctx.AnyRobberyActive && player.IsDead)
                     {
-                        DebugLogger.Info("Player died during robbery — sending death message");
+                        //DebugLogger.Info("Player died during robbery — sending death message");
                         SendRandomMessage(_meleeKillMsgs);
                         _messagesSentThisRobbery = _ctx.Config.MaxMessagesPerRobbery;
                     }
 
-                    DebugLogger.Trace("Player dead/arrested — clearing stalker queue");
+                    //DebugLogger.Trace("Player dead/arrested — clearing stalker queue");
                     _eventQueue.Clear();
                     return;
                 }

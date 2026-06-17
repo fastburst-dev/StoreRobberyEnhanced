@@ -22,7 +22,7 @@ namespace StoreRobberyEnhanced.Data
         // Basic store info
         public string Name;
         public Vector3 StorePos;
-        public float Radius = 3.0f;     // ⭐ NEW
+        public float Radius = 20.0f;     // ⭐ NEW
 
         // Clerk
         public Ped Clerk; // already there, just noting
