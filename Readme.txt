@@ -1,4 +1,4 @@
-⭐ GTA5‑Mods Upload Description — Store Robbery Enhanced (v2.6.9.0 Latest Release)
+⭐ GTA5‑Mods Upload Description — Store Robbery Enhanced (v2.6.9.7 Latest Release)
 (Fully polished, cinematic, feature‑rich, and ready for upload)
 
 🏪 Store Robbery Enhanced — Bringing GTA Online’s Robbery Achievements to Single Player with some huge twists.
@@ -389,6 +389,16 @@ v2.6.9.0
  * Fixed issue with infinite wanted level on failed robbery by wasted or busted
  * Added Support for 6 DLC Addon Stores (list of supported DLC Store Addons above)
  * Upgraded to Overhaul Complete Success Banner UI Logic and UI Display upon completion
+
+v2.6.9.7
+ * Fixed issues with clerk animations as incorrect animation calls no longer available
+ * Fixed issues with Flickering on timers
+ * Fixed clerk animation timing
+ * Added Speech Management System calls to Clerks
+ * Added logic of FeelingFroggy to where clerk may fight back and shoot with a pistol or shotgun to chase player off 30% chance
+ * Added Loot Trash Bag to be tossed in front of register that is collectible
+ * Added Clerk Dialog notifications for robbery
+ * Updated various logic improvements
 
 ⭐ CREDITS
 Created by James Neeley (FastBurst)  

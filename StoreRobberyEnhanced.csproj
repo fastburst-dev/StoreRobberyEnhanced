@@ -58,8 +58,7 @@
       <HintPath>..\..\..\GTAVE Modded\scripts\Newtonsoft.Json.dll</HintPath>
       <Private>False</Private>
     </Reference>
-    <Reference Include="ScriptHookVDotNet3, Version=3.7.0.123, Culture=neutral, processorArchitecture=AMD64">
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="ScriptHookVDotNet3">
       <HintPath>..\..\..\GTAVE Modded\ScriptHookVDotNet3.dll</HintPath>
       <Private>False</Private>
     </Reference>
