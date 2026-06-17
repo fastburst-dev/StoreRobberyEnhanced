@@ -420,7 +420,7 @@ namespace StoreRobberyEnhanced.Systems
         public void QueueMeleeKillMessage() { QueueMessage(_meleeKillMsgs); }
 
         // ------------------------------------------------------------
-        // PROCESS QUEUED EVENTS
+        // PROCESS QUEUED EVENTS (PATCHED FOR NEW SURRENDER LOGIC)
         // ------------------------------------------------------------
         public void ProcessEvents()
         {
@@ -428,6 +428,42 @@ namespace StoreRobberyEnhanced.Systems
             {
                 var player = Game.Player.Character;
 
+                // ------------------------------------------------------------
+                // ⭐ NEW: Detect surrender-in-progress so we DON'T shut down
+                // ------------------------------------------------------------
+                TrackedStore activeStore = null;
+
+                // Find the active store (robbery in progress)
+                foreach (var s in _ctx.Stores)
+                {
+                    if (s.IsRobberyActive)
+                    {
+                        activeStore = s;
+                        break;
+                    }
+                }
+
+                // If clerk is in surrender flow:
+                // ClerkFleeing = true + SurrenderStage >= 1
+                // → DO NOT clear queue, DO NOT treat as robbery ended
+                if (activeStore != null)
+                {
+                    if (activeStore.ClerkFleeing && activeStore.ClerkSurrenderStage >= 1)
+                    {
+                        // Surrender in progress — treat as active robbery
+                    }
+                    else if (activeStore.ClerkFleeing && activeStore.ClerkSurrenderStage == 0)
+                    {
+                        // Actual fleeing (old behavior) → end robbery
+                        DebugLogger.Trace("Clerk actually fled — clearing stalker queue");
+                        _eventQueue.Clear();
+                        return;
+                    }
+                }
+
+                // ------------------------------------------------------------
+                // ORIGINAL LOGIC
+                // ------------------------------------------------------------
                 if (!_ctx.AnyRobberyActive)
                 {
                     DebugLogger.Trace("No robbery active — clearing stalker queue");
