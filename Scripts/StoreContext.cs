@@ -11,6 +11,7 @@ using StoreRobberyEnhanced.UI;
 using StoreRobberyEnhanced.Config;
 using StoreRobberyEnhanced.Debug;
 using StoreRobberyEnhanced.Minigame;
+using StoreRobberyEnhanced.Scripts.Systems;
 
 namespace StoreRobberyEnhanced
 {
@@ -26,11 +27,20 @@ namespace StoreRobberyEnhanced
         public static UiHelpers GlobalUi => Active?.Ui;
 
         internal PlayerHelper Player { get; private set; }
+        internal ClerkHelperSystem clerkHelper { get; private set; }
         public static StoreContext Active { get; private set; }
 
         public StoreContext()
         {
             Active = this;
+        }
+
+        // Backing field for global robbery state
+        private bool _anyRobberyActive;
+        // Allows other systems to toggle global robbery state safely
+        public void SetRobberyActive(bool active)
+        {
+            _anyRobberyActive = active;
         }
 
         // ------------------------------------------------------------
@@ -499,10 +509,11 @@ namespace StoreRobberyEnhanced
             {
                 try
                 {
+                    // If any store is active OR global flag is set
                     foreach (var s in Stores)
                         if (s.IsRobberyActive)
                             return true;
-                    return false;
+                    return _anyRobberyActive;
                 }
                 catch (Exception ex)
                 {
@@ -511,5 +522,6 @@ namespace StoreRobberyEnhanced
                 }
             }
         }
+
     }
 }

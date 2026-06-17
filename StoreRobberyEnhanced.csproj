@@ -119,6 +119,7 @@
     <Compile Include="Scripts\Systems\CooldownSystem.cs" />
     <Compile Include="Scripts\Systems\ShopConsumeSystem.cs" />
     <Compile Include="Scripts\Systems\ShopSystem.cs" />
+    <Compile Include="Scripts\Systems\SpeechManagerSystem.cs" />
     <Compile Include="Scripts\UI\PlayerHelper.cs" />
     <Compile Include="Scripts\Systems\PoliceSystem.cs" />
     <Compile Include="Scripts\Systems\RobberySystem.cs" />

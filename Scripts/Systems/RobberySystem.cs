@@ -318,6 +318,9 @@ namespace StoreRobberyEnhanced.Systems
             // ⭐ SAVE CLEAN STATE
             // ------------------------------------------------------------
             _ctx.SaveStoreState(store);
+
+            // ⭐ Debug reset ends all robbery activity globally
+            _ctx.SetRobberyActive(false);
         }
 
         // ------------------------------------------------------------
@@ -327,6 +330,10 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
+                // ⭐ ABSOLUTE PRIORITY — SafeCrack owns ALL UI while running
+                if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
+                    return;
+
                 // ⭐ UI SAFETY — NEVER UPDATE TIMER IF BANNER IS ACTIVE
                 if (StoreContext.GlobalUi.IsBannerActive)
                 {
@@ -343,14 +350,6 @@ namespace StoreRobberyEnhanced.Systems
 
                     // ⭐ ALWAYS clear timer when robbery ends
                     StoreContext.GlobalUi.ClearTimer();
-
-                    return;
-                }
-
-                // ⭐ Pause ALL robbery logic while SafeCrack is running
-                if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
-                {
-                    //StoreContext.GlobalUi.ClearTimer();
                     return;
                 }
 
@@ -365,9 +364,9 @@ namespace StoreRobberyEnhanced.Systems
                 // BAG PICKUP
                 if (store.LootBag != null && store.LootBag.Exists())
                 {
-                    float dist = player.Position.DistanceTo(store.LootBag.Position);
+                    float distBag = player.Position.DistanceTo(store.LootBag.Position);
 
-                    if (dist < 1.2f)
+                    if (distBag < 1.2f)
                     {
                         store.LootBag.Delete();
                         store.LootBag = null;
@@ -385,9 +384,9 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ Debug escape subtitle loop
                 if (_debugEscapeActive && store.Id == _debugEscapeStoreId && !store.CooldownActive)
                 {
-                    float dist = player.Position.DistanceTo(store.StorePos);
+                    float distDebug = player.Position.DistanceTo(store.StorePos);
 
-                    if (dist < _ctx.Config.EscapeDistance)
+                    if (distDebug < _ctx.Config.EscapeDistance)
                     {
                         if (Game.GameTime - _lastDebugSubtitleTime > 1000)
                         {
@@ -399,10 +398,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 // ⭐ If robbery is active, run core robbery logic
                 if (store.IsRobbed)
-                {             
-                    // ------------------------------------------------------------
-                    // Continue normal robbery logic
-                    // ------------------------------------------------------------
+                {
                     UpdateRobberyTimer(store);
                     CheckCameraTriggeredAlarm(store);
                     CheckLeavingEarly(store, player);
@@ -435,7 +431,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (store.CooldownActive)
                     return;
 
-                // ⭐ Try to start a register robbery
+                // ⭐ Try to start a register robbery (handles silent + loud)
                 TryStartRegisterRobbery(store, player);
 
                 // ⭐ Prevent ANY system from restarting SafeCrack while active
@@ -452,7 +448,7 @@ namespace StoreRobberyEnhanced.Systems
                 }
 
                 // ------------------------------------------------------------
-                // ⭐ PATCH N — SAFECRACK START VALIDATION (Silent + Loud)
+                // ⭐ PATCHED SAFECRACK START VALIDATION (Silent + Loud)
                 // ------------------------------------------------------------
                 if (store.IsRobbed &&
                     store.SafePos != Vector3.Zero &&
@@ -462,15 +458,29 @@ namespace StoreRobberyEnhanced.Systems
                     if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
                         return;
 
-                    // ⭐ PATCH P — Cannot start SafeCrack if clerk ragdolled
+                    // ⭐ SILENT ROBBERY SAFECRACK
+                    if (store.SilentRobbery)
+                    {
+                        float safeDistSilent = player.Position.DistanceTo(store.SafePos);
+                        if (safeDistSilent > 1.2f)
+                            return;
+
+                        _ctx.Ui.ShowHelpText("Press ~y~E~w~ to crack the safe");
+
+                        if (Game.IsControlJustPressed(GTA.Control.Context))
+                        {
+                            DebugLogger.Info($"[PATCH N] Starting SafeCrack (SILENT) at store {store.Id}");
+                            _ctx.SafeCrack.Start(store, store.SafePos, store.SafeHeading, player);
+                        }
+
+                        return;
+                    }
+
+                    // ⭐ LOUD ROBBERY VALIDATION
                     if (store.Clerk != null && store.Clerk.Exists() && store.Clerk.IsRagdoll)
                         return;
 
-                    // Clerk must be fully surrendered before safe cracking
-                    if (!store.ClerkFleeing || store.ClerkSurrenderStage < 3)
-                        return;
-
-                    // ⭐ PATCH S — Cannot start SafeCrack if clerk animation is mid‑phase
+                    // Cannot start if clerk is mid-animation
                     if (store.ClerkOpeningRegister || store.ClerkGrabbingCash || store.ClerkThrowingBag)
                         return;
 
@@ -479,13 +489,11 @@ namespace StoreRobberyEnhanced.Systems
                     if (safeDist > 1.2f)
                         return;
 
-                    // Show prompt
                     _ctx.Ui.ShowHelpText("Press ~y~E~w~ to crack the safe");
 
-                    // Start SafeCrack
                     if (Game.IsControlJustPressed(GTA.Control.Context))
                     {
-                        DebugLogger.Info($"[PATCH N] Starting SafeCrack at store {store.Id}");
+                        DebugLogger.Info($"[PATCH N] Starting SafeCrack (LOUD) at store {store.Id}");
                         _ctx.SafeCrack.Start(store, store.SafePos, store.SafeHeading, player);
                     }
                 }
@@ -581,6 +589,9 @@ namespace StoreRobberyEnhanced.Systems
                     store.IsRobbed = true;
                     store.RobberyStartUtc = DateTime.UtcNow;
                     store.PendingCompletion = true;
+
+                    // ⭐ Mark robbery as globally active (required for StalkerSystem)
+                    _ctx.SetRobberyActive(true);
 
                     // ------------------------------------------------------------
                     // ⭐ THIRD FIX — HARD LOCK SILENT ROBBERY STATE
@@ -680,6 +691,9 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 StartRegisterRobbery(store);
 
+                // ⭐ Mark robbery as globally active (required for StalkerSystem)
+                _ctx.SetRobberyActive(true);
+
                 if (_ctx.Config.EnableMessages)
                     _ctx.Ui.ShowNotification("~y~Robbery started!");
 
@@ -776,20 +790,21 @@ namespace StoreRobberyEnhanced.Systems
                 }
 
                 // ------------------------------------------------------------
-                // ⭐ SILENT ROBBERY — NO TIMER, NO POLICE
-                // ------------------------------------------------------------
-                if (store.SilentRobbery)
-                {
-                    StoreContext.GlobalUi.ClearTimer();
-                    return;
-                }
-
-                // ------------------------------------------------------------
                 // ⭐ PAUSE TIMER DURING SAFECRACK (DO NOT CLEAR UI)
                 // ------------------------------------------------------------
                 if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
                 {
                     // Do NOT clear timer — SafeCrack manages its own UI
+                    return;
+                }
+
+                // ------------------------------------------------------------
+                // ⭐ SILENT ROBBERY — NO ROBBERY TIMER, BUT DO NOT TOUCH UI
+                // (SafeCrack uses the same GlobalUi timer, so never ClearTimer here)
+                // ------------------------------------------------------------
+                if (store.SilentRobbery)
+                {
+                    // Just skip robbery timer logic; SafeCrackController controls the timer text.
                     return;
                 }
 
@@ -1039,7 +1054,7 @@ namespace StoreRobberyEnhanced.Systems
                 // Store reference
                 store.LootBag = bag;
 
-                DebugLogger.Info($"[PATCH K] Spawned WHITE TRASH BAG for store {store.Id} at {dropPos}");
+                DebugLogger.Info($"[PATCH K] Spawned BLACK TRASH BAG for store {store.Id} at {dropPos}");
             }
             catch (Exception ex)
             {
@@ -1070,29 +1085,8 @@ namespace StoreRobberyEnhanced.Systems
                 if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
                     return;
 
-                // ------------------------------------------------------------
-                // 1. HARD BOUNDARY — END ROBBERY IF FULLY OUTSIDE
-                // ------------------------------------------------------------
                 float distToStore = player.Position.DistanceTo(store.StorePos);
 
-                //if (distToStore > store.Radius)
-                //{
-                //    DebugLogger.Warn($"[PATCH O] Player left store boundary early at store {store.Id}. Ending robbery.");
-
-                //    _clerks.ClearAllClerkPhases(store);
-                //    store.ClerkStalling = true;
-                //    store.PendingCompletion = false;
-
-                //    store.RobberyEnded = true;
-                //    store.IsRobbed = false;
-
-                //    _ctx.Ui.ShowNotification("~r~You left the store — robbery ended.");
-                //    return;
-                //}
-
-                // ------------------------------------------------------------
-                // 2. SAFE NOT CRACKED YET → SOFT WARNING IF DRIFTING
-                // ------------------------------------------------------------
                 if (!store.SafeCracked &&
                     store.SafePos != Vector3.Zero &&
                     !store.CooldownActive)
@@ -1103,9 +1097,6 @@ namespace StoreRobberyEnhanced.Systems
                         _ctx.Ui.ShowNotification("~y~Don't leave yet! Crack the safe to finish the robbery.");
                     }
                 }
-
-                // ⭐ No threat / silent / LOS logic here — keep this method cheap and safe.
-                // Those rules live in PlayerThreatValid + phase handlers.
             }
             catch (Exception ex)
             {
@@ -1272,6 +1263,8 @@ namespace StoreRobberyEnhanced.Systems
 
                     _ctx.Ui.ClearTimer();
 
+                    _ctx.SetRobberyActive(false);
+
                     AwardPayout(store);
                     BeginCooldown(store);
                     return;
@@ -1300,11 +1293,15 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ Clear UI timer immediately
                 _ctx.Ui.ClearTimer();
 
+                // ⭐ Robbery is fully complete — disable global robbery flag
+                _ctx.SetRobberyActive(false);
+
                 // ------------------------------------------------------------
                 // PAYOUT + COOLDOWN
                 // ------------------------------------------------------------
                 AwardPayout(store);
                 BeginCooldown(store);
+
             }
             catch (Exception ex)
             {

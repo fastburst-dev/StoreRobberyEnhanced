@@ -6,6 +6,7 @@ using StoreRobberyEnhanced.Debug;
 using StoreRobberyEnhanced.Systems;
 using StoreRobberyEnhanced.UI;
 using System;
+using static StoreRobberyEnhanced.Systems.ClerkSystem;
 
 namespace StoreRobberyEnhanced.Scripts.Systems
 {
@@ -20,25 +21,23 @@ namespace StoreRobberyEnhanced.Scripts.Systems
         {
             _ctx = ctx;
             _rng = new Random();
-        }
+        }        
 
-        // ------------------------------------------------------------
-        // SMALL HELPER: ANIM CHECK
-        // ------------------------------------------------------------
-        public bool IsPlayingAnim(Ped ped, string dict, string name)
+        public bool IsValidPhaseTransition(ClerkPhase from, ClerkPhase to)
         {
-            if (ped == null || !ped.Exists())
-                return false;
+            return (from, to) switch
+            {
+                (ClerkPhase.Stall, ClerkPhase.RegisterOpening) => true,
+                (ClerkPhase.RegisterOpening, ClerkPhase.CashGrab) => true,
+                (ClerkPhase.CashGrab, ClerkPhase.BagToss) => true,
+                (ClerkPhase.BagToss, ClerkPhase.Flee) => true,
+                (ClerkPhase.Flee, ClerkPhase.Surrender) => true,
 
-            try
-            {
-                return Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, ped.Handle, dict, name, 3);
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogException("ClerkSystem.IsPlayingAnim", ex);
-                return false;
-            }
+                // Allow staying in same phase
+                (var a, var b) when a == b => true,
+
+                _ => false
+            };
         }
 
         // ------------------------------------------------------------
@@ -51,26 +50,7 @@ namespace StoreRobberyEnhanced.Scripts.Systems
 
             // Use your existing PlayerHelper for positional checks
             return _ctx.Player.IsInsideStore(store, store.Radius);
-        }
-
-        // ------------------------------------------------------------
-        // PATCH F — Animation Safety Check
-        // ------------------------------------------------------------
-        public bool IsClerkBusy(Ped clerk)
-        {
-            if (clerk == null || !clerk.Exists())
-                return true;
-
-            // If ANY animation is playing, clerk is busy
-            return Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "mp_common", "givetake1_a", 3) ||
-                   Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "mp_common", "givetake2_a", 3) ||
-                   Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "random@arrests", "idle_2_hands_up", 3) ||
-                   Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "rcmme_tracey1", "nervous_loop", 3) ||
-                   Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "oddjobs@shop_robbery@rob_till", "enter", 3) ||
-                   Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "oddjobs@shop_robbery@rob_till", "loop", 3) ||
-                   Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "anim@heists@ornate_bank@grab_cash", "idle", 3) ||
-                   Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, clerk.Handle, "mp_am_hold_up", "purchase_beer_shopkeeper", 3);
-        }
+        }        
 
         // ------------------------------------------------------------
         // PATCH G — Clerk Position Validation
@@ -82,165 +62,7 @@ namespace StoreRobberyEnhanced.Scripts.Systems
 
             float dist = clerk.Position.DistanceTo(store.RegisterPos);
             return dist <= tolerance;
-        }
-
-        // ------------------------------------------------------------
-        // PATCH I — Unified Player Threat Validation (Silent + Loud)
-        // NULL-SAFE + PATCH U COMPATIBLE + NO DUPLICATE LOGIC
-        // ------------------------------------------------------------
-        public bool PlayerThreatValid(TrackedStore store, Ped clerk, Ped player)
-        {
-            try
-            {
-                // ⭐ Absolute safety
-                if (store == null || clerk == null || player == null)
-                    return false;
-
-                if (!clerk.Exists() || !player.Exists())
-                    return false;
-
-                // ⭐ Position safety
-                if (clerk.Position == Vector3.Zero || player.Position == Vector3.Zero)
-                    return false;
-
-                PlayerHelper ph = _ctx.Player;
-                if (ph == null)
-                    return false;
-
-                // ------------------------------------------------------------
-                // 1. DISTANCE CHECK
-                // ------------------------------------------------------------
-                float dist = player.Position.DistanceTo(clerk.Position);
-
-                if (store.SilentRobbery)
-                {
-                    // Silent robbery requires very close range
-                    if (dist > 3.0f)
-                        return false;
-                }
-                else
-                {
-                    // Loud robbery threat radius
-                    if (dist > 8.0f)
-                        return false;
-                }
-
-                // ------------------------------------------------------------
-                // 2. LINE OF SIGHT CHECK
-                // ------------------------------------------------------------
-                if (!store.SilentRobbery)
-                {
-                    bool los = false;
-                    try { los = ph.IsInLOS(clerk); }
-                    catch { return false; }
-
-                    if (!los)
-                        return false;
-                }
-
-                // ------------------------------------------------------------
-                // 3. WEAPON + THREAT CHECK
-                // ------------------------------------------------------------
-                Weapon current = null;
-                try { current = player.Weapons?.Current; }
-                catch { current = null; }
-
-                bool hasWeapon = current != null && current.Hash != WeaponHash.Unarmed;
-
-                bool isMelee = false;
-                bool isGun = false;
-
-                if (hasWeapon)
-                {
-                    try { isMelee = ph.IsMeleeWeapon(current.Hash); }
-                    catch { isMelee = false; }
-
-                    isGun = !isMelee;
-                }
-
-                bool isAiming = false;
-                try { isAiming = ph.IsAiming(); }
-                catch { isAiming = false; }
-
-                // ------------------------------------------------------------
-                // 4. SILENT ROBBERY LOGIC
-                // ------------------------------------------------------------
-                if (store.SilentRobbery)
-                {
-                    // Must be melee
-                    if (!isMelee)
-                        return false;
-
-                    // Must NOT aim
-                    if (isAiming)
-                        return false;
-
-                    // Must be masked
-                    bool masked = false;
-                    try { masked = ph.IsMasked(); }
-                    catch { masked = false; }
-
-                    if (!masked)
-                        return false;
-
-                    // Must stay in front arc of clerk
-                    Vector3 toPlayer = (player.Position - clerk.Position).Normalized;
-                    float dot = Vector3.Dot(clerk.ForwardVector, toPlayer);
-
-                    if (dot < 0.0f)
-                        return false;
-
-                    return true;
-                }
-
-                // ------------------------------------------------------------
-                // 5. LOUD ROBBERY LOGIC
-                // ------------------------------------------------------------
-                // Gun + aiming = threat
-                if (isGun && isAiming)
-                    return true;
-
-                // Melee = threat (aiming optional)
-                if (isMelee)
-                    return true;
-
-                // No threat
-                return false;
-            }
-            catch
-            {
-                // ⭐ Fail-safe: never crash
-                return false;
-            }
-        }
-
-        // ------------------------------------------------------------
-        // PATCH P — Clerk Ragdoll Recovery
-        // ------------------------------------------------------------
-        public bool HandleClerkRagdoll(TrackedStore store)
-        {
-            Ped clerk = store.Clerk;
-            if (clerk == null || !clerk.Exists())
-                return false;
-
-            // If clerk is ragdolled → recover safely
-            if (clerk.IsRagdoll)
-            {
-                DebugLogger.Warn($"[PATCH P] Clerk ragdolled at store {store.Id}. Resetting to stall.");
-
-                _clerks. ClearAllClerkPhases(store);
-                store.ClerkStalling = true;
-                store.PendingCompletion = false;
-
-                // Force clerk to stand up
-                clerk.Task.ClearAllImmediately();
-                Function.Call(Hash.RESET_PED_RAGDOLL_TIMER, clerk.Handle);
-
-                return true; // ragdoll handled
-            }
-
-            return false; // no ragdoll
-        }
+        }               
 
         // ------------------------------------------------------------
         // PATCH Q — Clerk Position & Heading Validation
@@ -348,7 +170,7 @@ namespace StoreRobberyEnhanced.Scripts.Systems
                 return false;
 
             // If animation is missing or cancelled, restart it
-            if (!IsPlayingAnim(clerk, animDict, animName))
+            if (!_clerks.IsPlayingAnim(clerk, animDict, animName))
             {
                 DebugLogger.Warn($"[PATCH S] Clerk animation '{animName}' cancelled at store {store.Id}. Restarting.");
 
@@ -364,95 +186,6 @@ namespace StoreRobberyEnhanced.Scripts.Systems
 
             return false; // animation intact
         }
-
-        // ------------------------------------------------------------
-        // SAFE LOAD: ANIM CHECK
-        // ------------------------------------------------------------
-        public bool SafeLoadAnimDict(string dict)
-        {
-            Function.Call(Hash.REQUEST_ANIM_DICT, dict);
-
-            int timeout = Game.GameTime + 2000;
-            while (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, dict))
-            {
-                Script.Yield();
-                if (Game.GameTime > timeout)
-                {
-                    DebugLogger.Warn($"Anim dict failed to load: {dict}");
-                    return false;
-                }
-            }
-
-            return true;
-        }
-
-        // ------------------------------------------------------------
-        // NATIVE ANIMATION WRAPPER (SHVDN 3.9.0 SAFE, SIMPLE REQUEST)
-        // ------------------------------------------------------------
-        public void PlayAnimNative(Ped ped, string dict, string anim, AnimationFlags flags)
-        {
-            if (ped == null || !ped.Exists())
-                return;
-
-            // ⭐ BLOCK MOST ROOT-MOTION HOLD-UP ANIMS, BUT ALLOW REGISTER OPEN
-            if (dict == "mp_am_hold_up")
-            {
-                // Allow the specific register animation we actually use
-                if (!string.Equals(anim, "purchase_beer_shopkeeper", StringComparison.OrdinalIgnoreCase))
-                {
-                    DebugLogger.Info($"[ANIM-BLOCK] Suppressed root-motion anim {dict}/{anim} on ped {ped.Handle}");
-                    return;
-                }
-            }
-
-            try
-            {
-                Function.Call(Hash.REQUEST_ANIM_DICT, dict);
-
-                DebugLogger.Info($"[ANIM] Requesting anim {dict}/{anim} on ped {ped.Handle}");
-
-                Function.Call(
-                    Hash.TASK_PLAY_ANIM,
-                    ped.Handle,
-                    dict,
-                    anim,
-                    8.0f,
-                    -8.0f,
-                    -1,
-                    (int)flags,
-                    0,
-                    false, false, false
-                );
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogException($"ClerkSystem.PlayAnimNative {dict}/{anim}", ex);
-            }
-        }
-
-        // ------------------------------------------------------------
-        // SAFE SPEECH WRAPPER (SHVDN 3.9.0 SAFE)
-        // ------------------------------------------------------------
-        public void SafePlaySpeech(Ped ped, string speechName, string speechParam)
-        {
-            if (ped == null || !ped.Exists())
-                return;
-
-            try
-            {
-                // SHVDN 3.9.0: use native PLAY_PED_AMBIENT_SPEECH_NATIVE
-                Function.Call(
-                    Hash.PLAY_PED_AMBIENT_SPEECH_NATIVE,
-                    ped.Handle,
-                    speechName,
-                    speechParam,
-                    0 // p3 (always 0 in game scripts)
-                );
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogException($"ClerkSystem.SafePlaySpeech {speechName}", ex);
-            }
-        }
+        
     }
 }

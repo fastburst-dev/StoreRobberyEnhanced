@@ -458,6 +458,7 @@ namespace StoreRobberyEnhanced.UI
                 DebugLogger.LogException("PlayerHelper.IsThreatening", ex);
                 return false;
             }
+
         }
     }
 }

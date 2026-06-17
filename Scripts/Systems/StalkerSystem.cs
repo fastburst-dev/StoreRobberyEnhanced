@@ -395,7 +395,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (DateTime.UtcNow < _nextAllowedMessageTime)
                     return;
 
-                int delay = _rng.Next(5000, 10000);
+                int delay = _rng.Next(2000, 10000);
 
                 StalkerEvent evt = new StalkerEvent
                 {
