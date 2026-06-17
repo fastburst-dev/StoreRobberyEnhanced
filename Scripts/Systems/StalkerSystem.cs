@@ -325,7 +325,7 @@ namespace StoreRobberyEnhanced.Systems
                     _callerImage,
                     _callerName,
                     "UNKNOWN NUMBER",
-                    msg
+                    msg, 1
                 );
 
                 DebugLogger.Info("Forced stalker message sent");
@@ -525,7 +525,7 @@ namespace StoreRobberyEnhanced.Systems
                     _callerImage,
                     _callerName,
                     "NO CALLER ID",
-                    msg
+                    msg, 1
                 );
 
                 _messagesSentThisRobbery++;

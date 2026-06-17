@@ -174,6 +174,7 @@ namespace StoreRobberyEnhanced
                 // 2. Core helpers
                 Ui = new UiHelpers(Config);
                 Player = new PlayerHelper(this);
+                clerkHelper = new ClerkHelperSystem(this);
 
                 // 3. Build stores
                 StoreInitializer.BuildStores(this);

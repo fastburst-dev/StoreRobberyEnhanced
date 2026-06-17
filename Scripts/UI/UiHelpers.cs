@@ -288,7 +288,7 @@ namespace StoreRobberyEnhanced.UI
         // ------------------------------------------------------------
         // TEXT NOTIFICATIONS (STALKER)
         // ------------------------------------------------------------
-        public void TextNotification(string avatar, string author, string title, string message)
+        public void TextNotification(string avatar, string author, string title, string message, int iconTyle = 0)
         {
             try
             {
@@ -306,7 +306,7 @@ namespace StoreRobberyEnhanced.UI
 
                 Function.Call<int>(
                     Hash.END_TEXT_COMMAND_THEFEED_POST_MESSAGETEXT,
-                    avatar, avatar, true, 0, title, author
+                    avatar, avatar, true, iconTyle, title, author
                 );
             }
             catch (Exception ex)
