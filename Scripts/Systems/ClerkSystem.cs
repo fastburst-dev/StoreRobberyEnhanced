@@ -223,8 +223,15 @@ namespace StoreRobberyEnhanced.Systems
                     store.ClerkFleeing = false;
                     store.ClerkSurrenderStage = 0;
                     store.ClerkSurrender = false;
-                    //if (store.ClerkFleeing)
-                    //    ProcessFlee(store, clerk);
+
+                    // ⭐ NEW: clear surrender idle anim if still playing
+                    if (IsPlayingAnim(clerk, "random@arrests@busted", "idle_a") ||
+                        IsPlayingAnim(clerk, "random@arrests@busted", "idle_b") ||
+                        IsPlayingAnim(clerk, "random@arrests@busted", "idle_c"))
+                    {
+                        DebugLogger.Info($"[RESET] Clearing surrender idle on clerk {clerk.Handle} after robbery end.");
+                        Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, clerk);
+                    }
 
                     return;
                 }
@@ -438,20 +445,41 @@ namespace StoreRobberyEnhanced.Systems
                 if (store == null)
                     return;
 
-                // If clerk already exists, do nothing
+                // ------------------------------------------------------------
+                // ⭐ PRE-CLEANUP — Remove any existing clerk stuck in surrender or idle
+                // ------------------------------------------------------------
                 if (store.Clerk != null && store.Clerk.Exists())
-                    return;
+                {
+                    // Clear surrender/idle animations
+                    if (Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, store.Clerk.Handle, "random@arrests@busted", "idle_a", 3) ||
+                        Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, store.Clerk.Handle, "random@arrests@busted", "idle_b", 3) ||
+                        Function.Call<bool>(Hash.IS_ENTITY_PLAYING_ANIM, store.Clerk.Handle, "random@arrests@busted", "idle_c", 3))
+                    {
+                        DebugLogger.Info($"[ForceSpawnClerk] Clearing surrender idle on clerk {store.Clerk.Handle} before respawn.");
+                        Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, store.Clerk);
+                    }
 
+                    // Delete old clerk safely
+                    store.Clerk.MarkAsNoLongerNeeded();
+                    store.Clerk.Delete();
+                    store.Clerk = null;
+                }
+
+                // ------------------------------------------------------------
+                // ⭐ SPAWN NEW CLERK
+                // ------------------------------------------------------------
                 Ped clerk = World.CreatePed(PedHash.Business01AMM, store.ClerkPos, store.ClerkHeading);
 
                 if (clerk == null || !clerk.Exists())
+                {
+                    DebugLogger.Warn($"[ForceSpawnClerk] Failed to spawn clerk for store {store.Id}");
                     return;
+                }
 
                 store.Clerk = clerk;
 
                 // ⭐ Record spawn time for interior detach logic
                 store.ClerkSpawnTime = Game.GameTime;
-
                 store.IsOurClerk = true;
 
                 clerk.IsPersistent = true;
@@ -465,11 +493,11 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ SECOND FIX — STOP FUTURE CLERK SWEEPS
                 // ------------------------------------------------------------
                 store.DefaultClerkRemoved = true;
-
-                // Push next sweep far into the future so ClerkReplacementSystem stops touching this store
                 store.LastClerkSweepUtc = DateTime.UtcNow + TimeSpan.FromHours(12);
 
-                // ⭐ Reset clerk state machine after spawn
+                // ------------------------------------------------------------
+                // ⭐ RESET CLERK STATE MACHINE
+                // ------------------------------------------------------------
                 store.ClerkReacted = false;
                 store.ClerkSurrenderStage = 0;
                 store.ClerkStalling = false;
@@ -480,13 +508,20 @@ namespace StoreRobberyEnhanced.Systems
                 store.ClerkFleeing = false;
                 store.ClerkRecognizedPlayer = false;
 
-                DebugLogger.Info($"ForceSpawnClerk: Clerk spawned and sweeps disabled for store {store.Id}");
+                // ⭐ Ensure clerk starts clean (no surrender or panic)
+                Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, clerk);
+                Function.Call(Hash.SET_BLOCKING_OF_NON_TEMPORARY_EVENTS, clerk, true);
+                Function.Call(Hash.SET_PED_CAN_BE_TARGETTED, clerk, true);
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 46, false);
+
+                DebugLogger.Info($"ForceSpawnClerk: Clerk spawned cleanly and sweeps disabled for store {store.Id}");
             }
             catch (Exception ex)
             {
                 DebugLogger.LogException("ClerkSystem.ForceSpawnClerk", ex);
             }
         }
+
 
         // ------------------------------------------------------------
         // SPAWN DUMMY CLERK
@@ -533,7 +568,7 @@ namespace StoreRobberyEnhanced.Systems
             {
                 DebugLogger.LogException("ClerkSystem.SpawnDummyClerk", ex);
             }
-        }
+        }        
 
         // ------------------------------------------------------------
         // PATCH I — Unified Player Threat Validation (Silent + Loud)

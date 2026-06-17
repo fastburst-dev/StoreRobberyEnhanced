@@ -285,6 +285,14 @@ namespace StoreRobberyEnhanced.Systems
                 store.LootBag = null;
             }
 
+            if (store.Clerk != null && store.Clerk.Exists())
+            {
+                Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, store.Clerk);
+                store.Clerk.MarkAsNoLongerNeeded();
+                store.Clerk.Delete();
+                store.Clerk = null;
+            }
+
             // ------------------------------------------------------------
             // ⭐ DUMMY CLERK
             // ------------------------------------------------------------
@@ -1464,6 +1472,19 @@ namespace StoreRobberyEnhanced.Systems
                     store.LootBag.Delete();
                     store.LootBag = null;
                 }
+
+                if (store.Clerk != null && store.Clerk.Exists())
+                {
+                    Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, store.Clerk);
+                    store.Clerk.MarkAsNoLongerNeeded();
+                    store.Clerk.Delete();
+                    store.Clerk = null;
+                }
+
+                //if (store.RobberyEnded && !store.CooldownActive)
+                //{
+                //    _clerks.ResetClerkAfterRobbery(store);
+                //}
 
                 // ------------------------------------------------------------
                 // ⭐ APPLY COOLDOWN VISUALS + SAVE

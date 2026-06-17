@@ -171,7 +171,7 @@ namespace StoreRobberyEnhanced.Initialization
                 "24/7 Supermarket (Palomino Highlands)",
                 new Vector3(2555.500f, 380.800f, 108.600f),
                 new Vector3(2554.85f, 380.85f, 108.62f),            // ClerkPos
-                320.00f,                                            // ClerkHeading
+                358.00f,                                            // ClerkHeading
                 new Vector3(2557.00f, 383.38f, 108.62f),            // RegisterPos
                 160.27f,                                            // RegisterHeading
                 new Vector3(2549.27f, 384.91f, 108.62f),            // SafePos

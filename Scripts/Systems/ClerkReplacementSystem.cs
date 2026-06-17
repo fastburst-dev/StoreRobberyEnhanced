@@ -41,6 +41,13 @@ namespace StoreRobberyEnhanced.Systems
             if (store == null)
                 return;
 
+            // ⭐ NEW PATCH — Reset clerk after robbery ends
+            if (store.RobberyEnded && !store.CooldownActive)
+            {
+                ResetClerk(store);
+                return;
+            }
+
             // Only care if player is near this store
             float dist = player.Position.DistanceTo(store.StorePos);
             if (dist > store.Radius + 10f)
@@ -80,9 +87,15 @@ namespace StoreRobberyEnhanced.Systems
                 Game.Player.WantedLevel = 0;
                 _ctx.Police.SuppressPoliceForDebug = true;
 
-                // If our clerk already exists, just keep the area clean
+                // If clerk exists BUT is in a broken state (surrender, cower, panic), reset him
                 if (store.Clerk != null && store.Clerk.Exists())
                 {
+                    if (store.ClerkPanicking || store.ClerkSurrenderStage > 0)
+                    {
+                        ResetClerk(store);
+                        return;
+                    }
+
                     RemoveNearbyDefaultClerks(store, store.Clerk);
                     store.DefaultClerkRemoved = true;
                     return;
@@ -153,5 +166,44 @@ namespace StoreRobberyEnhanced.Systems
                 }
             }
         }
+
+        private void ResetClerk(TrackedStore store)
+        {
+            try
+            {
+                Ped clerk = store.Clerk;
+
+                // Delete old clerk
+                if (clerk != null && clerk.Exists())
+                {
+                    clerk.Task.ClearAllImmediately();
+                    clerk.MarkAsNoLongerNeeded();
+                    clerk.Delete();
+                }
+
+                store.Clerk = null;
+
+                // Reset all clerk state flags
+                store.ClerkReacted = false;
+                store.ClerkFleeing = false;
+                store.ClerkPanicking = false;
+                store.ClerkSurrenderStage = 0;
+                store.ClerkOpeningRegister = false;
+                store.ClerkGrabbingCash = false;
+                store.ClerkThrowingBag = false;
+                store.ClerkStalling = false;
+
+                store.ClerkAnimDurationMs = 0;
+                store.ClerkAnimStartUtc = DateTime.UtcNow;
+
+                // Spawn a fresh clerk
+                _ctx.Clerks.ForceSpawnClerk(store);
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogException("ClerkReplacementSystem.ResetClerk", ex);
+            }
+        }
+
     }
 }

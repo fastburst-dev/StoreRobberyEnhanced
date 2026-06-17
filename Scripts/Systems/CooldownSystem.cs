@@ -10,6 +10,7 @@ namespace StoreRobberyEnhanced.Systems
     internal class CooldownSystem
     {
         private readonly StoreContext _ctx;
+        private readonly ClerkSystem _clerks;
         private int _lastSubtitleTime = 0;
         public CooldownSystem(StoreContext ctx)
         {
@@ -354,6 +355,17 @@ namespace StoreRobberyEnhanced.Systems
                 store.ClerkStalling = false;
                 store.StallStartUtc = DateTime.MinValue;
                 store.StallDurationMs = 0;
+                store.ClerkSurrenderStage = 0;
+                store.IsRobberyActive = false;
+                _ctx.SetRobberyActive(false);
+
+                if (store.Clerk != null && store.Clerk.Exists())
+                {
+                    Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, store.Clerk);
+                    store.Clerk.MarkAsNoLongerNeeded();
+                    store.Clerk.Delete();
+                    store.Clerk = null;
+                }
 
                 RemoveCooldownBlocker(store);
                 UpdateStoreBlip(store);
