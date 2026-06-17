@@ -75,13 +75,13 @@ namespace StoreRobberyEnhanced
         public int MaxMessagesPerRobbery { get; private set; }
         public int MessageCooldownSeconds { get; private set; }
 
-        public List<string> StalkerRobberyMsgs = new List<string>();
-        public List<string> StalkerEscapeMsgs = new List<string>();
-        public List<string> StalkerKnockoutMsgs = new List<string>();
-        public List<string> StalkerGunKillMsgs = new List<string>();
-        public List<string> StalkerMeleeKillMsgs = new List<string>();
-        public List<string> StalkerCallAnsweredMsgs = new List<string>();
-        public List<string> StalkerCallIgnoredMsgs = new List<string>();
+        public List<string> StalkerRobberyMsgs { get; private set; } = new List<string>();
+        public List<string> StalkerEscapeMsgs { get; private set; } = new List<string>();
+        public List<string> StalkerKnockoutMsgs { get; private set; } = new List<string>();
+        public List<string> StalkerGunKillMsgs { get; private set; } = new List<string>();
+        public List<string> StalkerMeleeKillMsgs { get; private set; } = new List<string>();
+        public List<string> StalkerCallAnsweredMsgs { get; private set; } = new List<string>();
+        public List<string> StalkerCallIgnoredMsgs { get; private set; } = new List<string>();
 
         public IniConfig(Script script)
         {

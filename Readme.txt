@@ -404,7 +404,7 @@ v2.7.0.1
  * Added new config option for Stalker Messages Types = 1 chat box, 2 Email, 3 Add Friend Request or 0 None Right corner icons
  * Added additional new Stalker messages now each section has over 60 messages pre-programmed
  * Updated code logic to support new setting
- * 
+ * Updated Mission Banner to stay on screen until you press the buttons on bottom right
  * 
  * 
  * 
