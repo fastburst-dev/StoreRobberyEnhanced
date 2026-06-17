@@ -38,13 +38,14 @@ namespace StoreRobberyEnhanced.UI
             public Scaleform Background;  // MP_RESULTS_PANEL
             public bool PlaySound;
             public bool AllowManualClose = false;
-            public int MinDisplayMs = 1000; // time before button appears
+            public int MinDisplayMs = 3000; // time before button appears
             public string ContinueText = "Press ~INPUT_FRONTEND_ACCEPT~ to Continue";
         }
 
         private readonly Queue<ActiveBanner> _bannerQueue = new Queue<ActiveBanner>();
         private ActiveBanner _currentBanner;
         private Scaleform _instructionalButtons;
+        private float _instructionalAlpha = 0f;
 
         private bool _suppressUiUntilBannerDone = false;
 
@@ -162,10 +163,10 @@ namespace StoreRobberyEnhanced.UI
                     Type = BannerType.HeistPassed,
                     Title = title,
                     Subtitle = finalSubtitle,
-                    DurationMs = 10000,
+                    DurationMs = 600000,
                     PlaySound = true,
                     AllowManualClose = true,
-                    MinDisplayMs = 1000
+                    MinDisplayMs = 3000
                 });
 
             }
@@ -276,11 +277,24 @@ namespace StoreRobberyEnhanced.UI
                     DebugLogger.Trace($"EndCurrentBanner: {_currentBanner.Type} / {_currentBanner.Title}");
                 }
 
+                // ⭐ Properly clear instructional buttons so they disappear
+                if (_instructionalButtons != null)
+                {
+                    try
+                    {
+                        _instructionalButtons.CallFunction("CLEAR_ALL");
+                        _instructionalButtons.CallFunction("DRAW_INSTRUCTIONAL_BUTTONS", -1);
+                    }
+                    catch { }
+                }
+
+                _instructionalButtons = null;
+                _instructionalAlpha = 0f;
+
                 _currentBanner = null;
                 _heistScaleform = null;
                 _celebration = null;
                 _suppressUiUntilBannerDone = false;
-                _instructionalButtons = null;
 
                 if (_bannerQueue.Count > 0)
                 {
@@ -371,9 +385,7 @@ namespace StoreRobberyEnhanced.UI
 
                 DebugLogger.Trace($"[BannerDraw] Type={_currentBanner.Type}, Time={now}/{endTime}");
 
-                // ------------------------------------------------------------
-                // ⭐ Render the banner (composite or simple)
-                // ------------------------------------------------------------
+                // Render banner
                 if (_currentBanner.Type == BannerType.HeistPassed ||
                     _currentBanner.Type == BannerType.HeistFailed ||
                     _currentBanner.Type == BannerType.LevelUp)
@@ -395,32 +407,60 @@ namespace StoreRobberyEnhanced.UI
                     }
                 }
 
-                // ------------------------------------------------------------
-                // ⭐ Manual Close Logic (GTA Online Style)
-                // ------------------------------------------------------------
+                // Manual close logic
                 if (_currentBanner.AllowManualClose)
                 {
                     int elapsed = now - _currentBanner.StartTime;
 
-                    // Only allow closing after minimum display time
+                    // If the banner's own lifetime is over, kill everything (banner + buttons)
+                    if (elapsed >= _currentBanner.DurationMs)
+                    {
+                        DebugLogger.Trace("Banner duration elapsed (manual close enabled) -> forcing EndCurrentBanner()");
+                        EndCurrentBanner();
+                        return;
+                    }
+
+                    // Only show buttons after MinDisplayMs, but before DurationMs
                     if (elapsed >= _currentBanner.MinDisplayMs)
                     {
-                        // Build instructional buttons if not created yet
-                        if (_instructionalButtons == null)
-                            BuildInstructionalButtons("Continue");
+                        bool usingController = Game.IsControlPressed(Control.LookUpOnly);
 
-                        // Draw the real Rockstar instructional button panel
+                        if (_instructionalButtons == null)
+                        {
+                            if (usingController)
+                            {
+                                BuildInstructionalButtons(
+                                    ("Continue", Control.FrontendAccept),
+                                    //("Replay", Control.FrontendX),
+                                    ("Exit", Control.FrontendCancel)
+                                );
+                            }
+                            else
+                            {
+                                BuildInstructionalButtons(
+                                    ("Continue (Enter)", Control.FrontendAccept),
+                                    //("Replay (R)", Control.Reload),
+                                    ("Exit (Esc)", Control.FrontendCancel)
+                                );
+                            }
+                        }
+
+                        _instructionalAlpha = Math.Min(_instructionalAlpha + 0.02f, 1f);
                         Function.Call(Hash.SET_SCRIPT_GFX_DRAW_ORDER, 1100);
                         _instructionalButtons.Render2D();
 
-                        // Accept button (controller + keyboard)
-                        bool pressed =
+                        bool pressedContinue =
                             Game.IsControlJustPressed(Control.FrontendAccept) ||
-                            Game.IsKeyPressed(System.Windows.Forms.Keys.Enter) ||
-                            Game.IsKeyPressed(System.Windows.Forms.Keys.Space) ||
-                            Game.IsKeyPressed(System.Windows.Forms.Keys.E);
+                            Game.IsKeyPressed(System.Windows.Forms.Keys.Enter);
 
-                        if (pressed)
+                        //bool pressedReplay =
+                        //    Game.IsControlJustPressed(Control.FrontendX);
+
+                        bool pressedExit =
+                            Game.IsControlJustPressed(Control.FrontendCancel) ||
+                            Game.IsKeyPressed(System.Windows.Forms.Keys.Escape);
+
+                        if (pressedContinue || pressedExit)
                         {
                             DebugLogger.Info("[Banner] Manual close triggered");
                             EndCurrentBanner();
@@ -428,13 +468,10 @@ namespace StoreRobberyEnhanced.UI
                         }
                     }
 
-                    // Do NOT auto-expire if manual close is enabled
-                    return;
+                    return; // do NOT auto-expire
                 }
 
-                // ------------------------------------------------------------
-                // ⭐ Auto-expire (only when manual close is disabled)
-                // ------------------------------------------------------------
+                // Auto-expire
                 if (now > endTime)
                 {
                     DebugLogger.Trace("Banner expired");
@@ -446,7 +483,6 @@ namespace StoreRobberyEnhanced.UI
                 DebugLogger.LogException("UiHelpers.DrawCurrentBanner", ex);
             }
         }
-
 
         // ------------------------------------------------------------
         // ⭐ Rockstar Composite Banner Renderer
@@ -497,8 +533,7 @@ namespace StoreRobberyEnhanced.UI
         // ------------------------------------------------------------
         // ⭐ Rockstar Composite Banner Button Prompt (appears after MinDisplayMs has passed)
         // ------------------------------------------------------------
-
-        private void BuildInstructionalButtons(string label)
+        private void BuildInstructionalButtons(params (string Label, Control Control)[] buttons)
         {
             try
             {
@@ -507,21 +542,33 @@ namespace StoreRobberyEnhanced.UI
                 _instructionalButtons.CallFunction("CLEAR_ALL");
                 _instructionalButtons.CallFunction("TOGGLE_MOUSE_BUTTONS", 0);
 
-                string button = Function.Call<string>(
-                    (Hash)0x0499D7B09FC9B407,
-                    2, // input group
-                    (int)Control.FrontendAccept,
-                    true
-                );
+                int slot = 0;
 
-                _instructionalButtons.CallFunction(
-                    "SET_DATA_SLOT",
-                    0,
-                    button,
-                    label
-                );
+                foreach (var b in buttons)
+                {
+                    // SHVDN 3.9.0: call native by hash
+                    string glyph = Function.Call<string>(
+                        (Hash)0x0499D7B09FC9B407,
+                        2, // input group
+                        (int)b.Control,
+                        true
+                    );
 
+                    _instructionalButtons.CallFunction(
+                        "SET_DATA_SLOT",
+                        slot,
+                        glyph,
+                        b.Label
+                    );
+
+                    slot++;
+                }
+
+                // Online-style bottom placement
+                _instructionalButtons.CallFunction("SET_BACKGROUND_COLOUR", 0, 0, 0, 80);
+                _instructionalButtons.CallFunction("SET_POSITION", 0.5f, 0.95f);
                 _instructionalButtons.CallFunction("DRAW_INSTRUCTIONAL_BUTTONS", -1);
+
             }
             catch (Exception ex)
             {
