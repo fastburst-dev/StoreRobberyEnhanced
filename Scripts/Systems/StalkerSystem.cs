@@ -34,7 +34,8 @@ namespace StoreRobberyEnhanced.Systems
         private Queue<StalkerEvent> _eventQueue;
 
         private string _callerImage;
-        private string _callerName;
+        private string _callerName; 
+        private int _messageType;
 
         private int _messagesSentThisRobbery = 0;
         private DateTime _nextAllowedMessageTime = DateTime.MinValue;
@@ -325,7 +326,7 @@ namespace StoreRobberyEnhanced.Systems
                     _callerImage,
                     _callerName,
                     "UNKNOWN NUMBER",
-                    msg, 1
+                    msg, _messageType
                 );
 
                 DebugLogger.Info("Forced stalker message sent");
@@ -358,6 +359,7 @@ namespace StoreRobberyEnhanced.Systems
                 _meleeKillMsgs = ini.StalkerMeleeKillMsgs;
                 _callAnsweredMsgs = ini.StalkerCallAnsweredMsgs;
                 _callIgnoredMsgs = ini.StalkerCallIgnoredMsgs;
+                _messageType = ini.StalkerMessageType;
 
                 // Sync iFruit contact name with INI
                 if (!string.IsNullOrWhiteSpace(_callerName))
@@ -525,7 +527,7 @@ namespace StoreRobberyEnhanced.Systems
                     _callerImage,
                     _callerName,
                     "NO CALLER ID",
-                    msg, 1
+                    msg, _messageType
                 );
 
                 _messagesSentThisRobbery++;

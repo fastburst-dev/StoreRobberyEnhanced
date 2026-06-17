@@ -1,4 +1,4 @@
-⭐ GTA5‑Mods Upload Description — Store Robbery Enhanced (v2.6.9.7 Latest Release)
+⭐ GTA5‑Mods Upload Description — Store Robbery Enhanced (v2.7.0.1 Latest Release)
 (Fully polished, cinematic, feature‑rich, and ready for upload)
 
 🏪 Store Robbery Enhanced — Bringing GTA Online’s Robbery Achievements to Single Player with some huge twists.
@@ -399,6 +399,15 @@ v2.6.9.7
  * Added Loot Trash Bag to be tossed in front of register that is collectible
  * Added Clerk Dialog notifications for robbery
  * Updated various logic improvements
+
+v2.7.0.1
+ * Added new config option for Stalker Messages Types = 1 chat box, 2 Email, 3 Add Friend Request or 0 None Right corner icons
+ * Added additional new Stalker messages now each section has over 60 messages pre-programmed
+ * Updated code logic to support new setting
+ * 
+ * 
+ * 
+ * 
 
 ⭐ CREDITS
 Created by James Neeley (FastBurst)  

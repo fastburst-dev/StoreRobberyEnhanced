@@ -40,39 +40,40 @@ namespace StoreRobberyEnhanced
         public int TimerBgB { get; private set; }
 
         // PUBLIC SETTINGS
-        public int RegisterMinAmount;
-        public int RegisterMaxAmount;
-        public int SafeMinAmount;
-        public int SafeMaxAmount;
+        public int RegisterMinAmount { get; private set; }
+        public int RegisterMaxAmount { get; private set; }
+        public int SafeMinAmount { get; private set; }
+        public int SafeMaxAmount { get; private set; }
 
-        public float PayoutMultiplier;
+        public float PayoutMultiplier { get; private set; }
 
-        public bool EnableMessages;
-        public bool EnablePolice;
-        public bool EnableCameras;
-        public bool UseStoreNames;
+        public bool EnableMessages { get; private set; }
+        public bool EnablePolice { get; private set; }
+        public bool EnableCameras { get; private set; }
+        public bool UseStoreNames { get; private set; }
 
-        public int CooldownMinutes;
-        public int RobberyTimeLimit;
-        public int CameraGraceSeconds;
-        public int EscapeDistance;
-        public int SafeCrackTimeSeconds;
+        public int CooldownMinutes { get; private set; }
+        public int RobberyTimeLimit { get; private set; }
+        public int CameraGraceSeconds { get; private set; }
+        public int EscapeDistance { get; private set; }
+        public int SafeCrackTimeSeconds { get; private set; }
 
         // ⭐ PHASE 3 ADDITIONS
-        public int SilentAlarmDelaySeconds;
-        public int ClerkCallDelaySeconds;
-        public int TimeEscalationSeconds;
+        public int SilentAlarmDelaySeconds { get; private set; }
+        public int ClerkCallDelaySeconds { get; private set; }
+        public int TimeEscalationSeconds { get; private set; }
 
         // STALKER SETTINGS
-        public bool EnableStalkerMsg;
-        public bool EnableStalkerCall;
-        public int StalkerCallChance;
+        public bool EnableStalkerMsg { get; private set; }
+        public bool EnableStalkerCall { get; private set; }
+        public int StalkerCallChance { get; private set; }
 
-        public string StalkerCallerImage;
-        public string StalkerCallerName;
+        public string StalkerCallerImage { get; private set; }
+        public string StalkerCallerName { get; private set; }
+        public int StalkerMessageType { get; private set; }
 
-        public int MaxMessagesPerRobbery;
-        public int MessageCooldownSeconds;
+        public int MaxMessagesPerRobbery { get; private set; }
+        public int MessageCooldownSeconds { get; private set; }
 
         public List<string> StalkerRobberyMsgs = new List<string>();
         public List<string> StalkerEscapeMsgs = new List<string>();
@@ -142,6 +143,7 @@ namespace StoreRobberyEnhanced
                 ini.WriteString("Stalker", "CallerName", "NO CALLER ID");
                 ini.WriteInt("Stalker", "MaxMessagesPerRobbery", 5);
                 ini.WriteInt("Stalker", "MessageCooldownSeconds", 20);
+                ini.WriteInt("Stalker", "MessageType", 1);
 
                 // TIMER UI
                 ini.WriteFloat("TIMER_UI", "PositionX", 0.265f);
@@ -220,6 +222,7 @@ namespace StoreRobberyEnhanced
             StalkerCallerName = ini.ReadString("Stalker", "CallerName", "NO CALLER ID");
             MaxMessagesPerRobbery = ini.ReadInt("Stalker", "MaxMessagesPerRobbery", 5);
             MessageCooldownSeconds = ini.ReadInt("Stalker", "MessageCooldownSeconds", 20);
+            StalkerMessageType = ini.ReadInt("Stalker", "MessageType", 1);
 
             // TIMER UI
             TimerPosX = ini.ReadFloat("TIMER_UI", "PositionX", 0.265f);
@@ -282,6 +285,7 @@ namespace StoreRobberyEnhanced
             ini.WriteString("Stalker", "CallerName", StalkerCallerName);
             ini.WriteInt("Stalker", "MaxMessagesPerRobbery", MaxMessagesPerRobbery);
             ini.WriteInt("Stalker", "MessageCooldownSeconds", MessageCooldownSeconds);
+            ini.WriteInt("Stalker", "MessageType", StalkerMessageType);
 
             // TIMER UI
             ini.WriteFloat("TIMER_UI", "PositionX", TimerPosX);
