@@ -255,6 +255,7 @@ Each category contains 35 unique lines.
 - CallerName  
 - MaxMessagesPerRobbery  
 - MessageCooldownSeconds  
+- MessageType = 1 chat box, 2 Email, 3 Add Friend Request or 0 None Right corner
 
 ### **[Store Settings]**
 - RegisterMinAmount / MaxAmount  
