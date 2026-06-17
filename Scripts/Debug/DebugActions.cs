@@ -3,6 +3,7 @@ using GTA.Math;
 using StoreRobberyEnhanced.Systems;
 using StoreRobberyEnhanced.UI;
 using System;
+using static System.Windows.Forms.AxHost;
 
 namespace StoreRobberyEnhanced.Debug
 {
@@ -10,6 +11,7 @@ namespace StoreRobberyEnhanced.Debug
     {
         private static StoreContext _ctx;
         public static bool IsReady => StoreContext.GlobalUi != null && _ctx != null;
+        private static int _PendingPayout = 0;
 
         public static void Init(UiHelpers ui, StoreContext ctx)
         {
@@ -134,7 +136,8 @@ namespace StoreRobberyEnhanced.Debug
         // ------------------------------------------------------------
         public static void TriggerBanner()
         {
-            StoreContext.GlobalUi.ShowHeistPassedBanner("~y~MISSION PASSED", "500000", "24/7 Supermarket (Vinewood Plaza)");
+           _PendingPayout = _ctx.Rng.Next(25000, 100000);
+            StoreContext.GlobalUi.ShowHeistPassedBanner("~y~MISSION PASSED", $"{ _PendingPayout }", "24/7 Supermarket (Vinewood Plaza)");
         }
 
         // ------------------------------------------------------------
