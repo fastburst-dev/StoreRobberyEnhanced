@@ -37,35 +37,6 @@ namespace StoreRobberyEnhanced.Systems
             Surrender = 6
         }
 
-        private bool IsThreateningSoft(Ped player, Ped clerk)
-        {
-            if (player == null || !player.Exists() || clerk == null || !clerk.Exists())
-                return false;
-
-            WeaponHash hash = player.Weapons.Current.Hash;
-            bool isMelee = _ctx.Player.IsMeleeWeapon(hash);
-
-            // ⭐ 1. Direct aim at clerk (ONLY guns count)
-            if (!isMelee &&
-                Function.Call<bool>(Hash.IS_PLAYER_FREE_AIMING_AT_ENTITY, Game.Player, clerk))
-                return true;
-
-            // ⭐ 2. Gun out + close range (melee does NOT count)
-            if (!isMelee &&
-                hash != WeaponHash.Unarmed &&
-                player.Position.DistanceTo(clerk.Position) < 6.5f)
-                return true;
-
-            // ⭐ 3. Aiming a gun (melee aim is NOT a threat)
-            if (!isMelee &&
-                Game.IsControlPressed(Control.Aim) &&
-                hash != WeaponHash.Unarmed)
-                return true;
-
-            // ⭐ 4. Melee weapons NEVER trigger clerk reaction
-            return false;
-        }
-        
         // ------------------------------------------------------------
         // MAIN UPDATE (PATCH 7 + PATCH 10 + PATCH 11 APPLIED)
         // ------------------------------------------------------------
@@ -193,7 +164,6 @@ namespace StoreRobberyEnhanced.Systems
                 if (store.ClerkSurrenderStage == 3 && store.IsRobberyActive)
                 {
                     // DebugLogger.Info($"[PATCH11] Clerk surrendered — ending robbery for store {store.Id}");
-
                     RunIdleSurrenderBehavior(store, clerk);
                     return;
                 }
@@ -443,7 +413,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 if (clerk == null || !clerk.Exists())
                 {
-                    DebugLogger.Warn($"[ForceSpawnClerk] Failed to spawn clerk for store {store.Id}");
+                    // DebugLogger.Warn($"[ForceSpawnClerk] Failed to spawn clerk for store {store.Id}");
                     return;
                 }
 
@@ -481,14 +451,13 @@ namespace StoreRobberyEnhanced.Systems
                 Function.Call(Hash.SET_PED_CAN_BE_TARGETTED, clerk, true);
                 Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 46, false);
 
-                DebugLogger.Info($"ForceSpawnClerk: Clerk spawned cleanly and sweeps disabled for store {store.Id}");
+                //DebugLogger.Info($"ForceSpawnClerk: Clerk spawned cleanly and sweeps disabled for store {store.Id}");
             }
             catch (Exception ex)
             {
                 DebugLogger.LogException("ClerkSystem.ForceSpawnClerk", ex);
             }
         }
-
 
         // ------------------------------------------------------------
         // SPAWN DUMMY CLERK
@@ -511,7 +480,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 if (dummy == null || !dummy.Exists())
                 {
-                    DebugLogger.Warn($"SpawnDummyClerk: Failed to spawn dummy clerk for store {store.Id}");
+                    // DebugLogger.Warn($"SpawnDummyClerk: Failed to spawn dummy clerk for store {store.Id}");
                     return;
                 }
 
@@ -529,23 +498,24 @@ namespace StoreRobberyEnhanced.Systems
 
                 Function.Call(Hash.SET_ENTITY_AS_MISSION_ENTITY, dummy.Handle, true, true);
 
-                DebugLogger.Info($"SpawnDummyClerk: Dummy clerk spawned for store {store.Id}");
+                // DebugLogger.Info($"SpawnDummyClerk: Dummy clerk spawned for store {store.Id}");
             }
             catch (Exception ex)
             {
                 DebugLogger.LogException("ClerkSystem.SpawnDummyClerk", ex);
             }
-        }        
+        }
 
         // ------------------------------------------------------------
         // PATCH I — Unified Player Threat Validation (Silent + Loud)
         // NULL-SAFE + PATCH U COMPATIBLE + NO DUPLICATE LOGIC
         // ------------------------------------------------------------
+
         public bool PlayerThreatValid(TrackedStore store, Ped clerk, Ped player)
         {
             try
             {
-                // ⭐ Absolute safety
+                // SAFETY
                 if (store == null || clerk == null || player == null)
                     return false;
 
@@ -560,21 +530,35 @@ namespace StoreRobberyEnhanced.Systems
                 if (ph == null)
                     return false;
 
-                // 1. DISTANCE CHECK
+                // 1. DISTANCE
                 float dist = player.Position.DistanceTo(clerk.Position);
 
                 if (store.SilentRobbery)
                 {
-                    // Silent robbery requires very close range
                     if (dist > 3.0f)
                         return false;
                 }
                 else
                 {
-                    // Loud robbery threat radius (doorway-friendly)
                     if (dist > 20.0f)
                         return false;
                 }
+
+                // WEAPON INFO
+                Weapon current = player.Weapons?.Current;
+                bool hasWeapon = current != null && current.Hash != WeaponHash.Unarmed;
+
+                bool isMelee = false;
+                bool isGun = false;
+
+                if (hasWeapon)
+                {
+                    // ⭐ Use YOUR melee list
+                    isMelee = ph.IsMeleeWeapon(current.Hash);
+                    isGun = !isMelee;
+                }
+
+                bool isAiming = ph.IsAiming();
 
                 // 2. LINE OF SIGHT CHECK
                 if (!store.SilentRobbery)
@@ -594,32 +578,12 @@ namespace StoreRobberyEnhanced.Systems
                     // Silent robbery can still be strict if you want LOS here later.
                 }
 
-                // 3. WEAPON + THREAT CHECK
-                Weapon current = null;
-                try { current = player.Weapons?.Current; }
-                catch { current = null; }
-
-                bool hasWeapon = current != null && current.Hash != WeaponHash.Unarmed;
-
-                bool isMelee = false;
-                bool isGun = false;
-
-                if (hasWeapon)
-                {
-                    try { isMelee = ph.IsMeleeWeapon(current.Hash); }
-                    catch { isMelee = false; }
-
-                    isGun = !isMelee;
-                }
-
-                bool isAiming = false;
-                try { isAiming = ph.IsAiming(); }
-                catch { isAiming = false; }
-
-                // 4. SILENT ROBBERY LOGIC
+                // ============================================================
+                // ⭐ SILENT ROBBERY MODE
+                // ============================================================
                 if (store.SilentRobbery)
                 {
-                    // Must be melee
+                    // Must be melee (your list)
                     if (!isMelee)
                         return false;
 
@@ -628,38 +592,47 @@ namespace StoreRobberyEnhanced.Systems
                         return false;
 
                     // Must be masked
-                    bool masked = false;
-                    try { masked = ph.IsMasked(); }
-                    catch { masked = false; }
-
-                    if (!masked)
+                    if (!ph.IsMasked())
                         return false;
 
-                    // Must stay in front arc of clerk
+                    // Must be in front arc
                     Vector3 toPlayer = (player.Position - clerk.Position).Normalized;
                     float dot = Vector3.Dot(clerk.ForwardVector, toPlayer);
-
                     if (dot < 0.0f)
                         return false;
 
                     return true;
                 }
 
-                // 5. LOUD ROBBERY LOGIC
-                // Gun + aiming = threat
+                // ============================================================
+                // ⭐ LOUD ROBBERY MODE (MERGED WITH OLD IsThreateningSoft)
+                // ============================================================
+
+                // 1. OLD: Direct free-aim at clerk (guns only)
+                if (isGun &&
+                    Function.Call<bool>(Hash.IS_PLAYER_FREE_AIMING_AT_ENTITY, Game.Player, clerk))
+                    return true;
+
+                // 2. OLD: Gun out + close range (<6.5m)
+                if (isGun && dist < 20.5f)
+                    return true;
+
+                // 3. OLD: Aiming a gun anywhere = threat
                 if (isGun && isAiming)
                     return true;
 
-                // Melee = threat (aiming optional)
+                // 4. NEW: Melee = threat (loud mode)
                 if (isMelee)
                     return true;
 
-                // No threat
+                // 5. NEW: Doorway aiming support (LOS optional)
+                if (isGun && isAiming)
+                    return true;
+
                 return false;
             }
             catch
             {
-                // ⭐ Fail-safe: never crash
                 return false;
             }
         }

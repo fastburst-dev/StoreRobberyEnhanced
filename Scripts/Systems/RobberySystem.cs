@@ -650,7 +650,9 @@ namespace StoreRobberyEnhanced.Systems
                     });
 
                     _ctx.SaveStoreState(store);
-                    _ctx.Cooldowns.UpdateStoreBlip(store);
+
+                    if(_ctx.Config.EnableBlips)
+                        _ctx.Cooldowns.UpdateStoreBlip(store);
 
                     return;
                 }
@@ -757,7 +759,9 @@ namespace StoreRobberyEnhanced.Systems
 
                 // Save state + update blip
                 _ctx.SaveStoreState(store);
-                _ctx.Cooldowns.UpdateStoreBlip(store);
+
+                if (_ctx.Config.EnableBlips)
+                    _ctx.Cooldowns.UpdateStoreBlip(store);
             }
             catch (Exception ex)
             {
@@ -1404,7 +1408,9 @@ namespace StoreRobberyEnhanced.Systems
 
                 // Persist state
                 _ctx.SaveStoreState(store);
-                _ctx.Cooldowns.UpdateStoreBlip(store);
+
+                if (_ctx.Config.EnableBlips)
+                    _ctx.Cooldowns.UpdateStoreBlip(store);
             }
             catch (Exception ex)
             {
@@ -1498,7 +1504,9 @@ namespace StoreRobberyEnhanced.Systems
                 _ctx.Cooldowns.ApplyCooldownBlocker(store);
                 _ctx.Cooldowns.UpdateStoreBlip(store);
                 _ctx.SaveStoreState(store);
-                _ctx.Blips.RefreshBlip(store.Id);
+
+                if (store.Blip != null && store.Blip.Exists() && _ctx.Config.EnableBlips)
+                    _ctx.Blips.RefreshBlip(store.Id);
 
                 // ------------------------------------------------------------
                 // ⭐ DEBUG ESCAPE CLEANUP (KEEP DebugResetStore)

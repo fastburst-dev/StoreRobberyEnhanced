@@ -26,6 +26,40 @@ namespace StoreRobberyEnhanced
         // NON‑DEBUG SETTINGS
         // ------------------------------------------------------------
 
+        // MAIN SETTINGS
+        public bool EnableMessages { get; private set; }
+        public bool EnablePolice { get; private set; }
+        public bool EnableBlips { get; private set; }
+        public int CooldownMinutes { get; private set; }
+        public int RobberyTimeLimit { get; private set; }
+        public int EscapeDistance { get; private set; }
+
+        // ⭐ POLICE SETTINGS
+        public int SilentAlarmDelaySeconds { get; private set; }
+        public int ClerkCallDelaySeconds { get; private set; }
+        public int TimeEscalationSeconds { get; private set; }
+
+        // STORE SETTINGS
+        public int RegisterMinAmount { get; private set; }
+        public int RegisterMaxAmount { get; private set; }
+        public int SafeMinAmount { get; private set; }
+        public int SafeMaxAmount { get; private set; }
+        public bool EnableCameras { get; private set; }
+        public bool UseStoreNames { get; private set; }
+        public int CameraGraceSeconds { get; private set; }
+        public int SafeCrackTimeSeconds { get; private set; }
+        public float PayoutMultiplier { get; private set; }       
+        
+        // STALKER SETTINGS
+        public bool EnableStalkerMsg { get; private set; }
+        public bool EnableStalkerCall { get; private set; }
+        public int StalkerCallChance { get; private set; }
+        public string StalkerCallerImage { get; private set; }
+        public string StalkerCallerName { get; private set; }
+        public int MaxMessagesPerRobbery { get; private set; }
+        public int MessageCooldownSeconds { get; private set; }
+        public int StalkerMessageType { get; private set; }
+
         // TIMER UI SETTINGS
         public float TimerPosX { get; private set; }
         public float TimerPosY { get; private set; }
@@ -39,42 +73,7 @@ namespace StoreRobberyEnhanced
         public int TimerBgG { get; private set; }
         public int TimerBgB { get; private set; }
 
-        // PUBLIC SETTINGS
-        public int RegisterMinAmount { get; private set; }
-        public int RegisterMaxAmount { get; private set; }
-        public int SafeMinAmount { get; private set; }
-        public int SafeMaxAmount { get; private set; }
-
-        public float PayoutMultiplier { get; private set; }
-
-        public bool EnableMessages { get; private set; }
-        public bool EnablePolice { get; private set; }
-        public bool EnableCameras { get; private set; }
-        public bool UseStoreNames { get; private set; }
-
-        public int CooldownMinutes { get; private set; }
-        public int RobberyTimeLimit { get; private set; }
-        public int CameraGraceSeconds { get; private set; }
-        public int EscapeDistance { get; private set; }
-        public int SafeCrackTimeSeconds { get; private set; }
-
-        // ⭐ PHASE 3 ADDITIONS
-        public int SilentAlarmDelaySeconds { get; private set; }
-        public int ClerkCallDelaySeconds { get; private set; }
-        public int TimeEscalationSeconds { get; private set; }
-
-        // STALKER SETTINGS
-        public bool EnableStalkerMsg { get; private set; }
-        public bool EnableStalkerCall { get; private set; }
-        public int StalkerCallChance { get; private set; }
-
-        public string StalkerCallerImage { get; private set; }
-        public string StalkerCallerName { get; private set; }
-        public int StalkerMessageType { get; private set; }
-
-        public int MaxMessagesPerRobbery { get; private set; }
-        public int MessageCooldownSeconds { get; private set; }
-
+        // STALKER MESSAGES
         public List<string> StalkerRobberyMsgs { get; private set; } = new List<string>();
         public List<string> StalkerEscapeMsgs { get; private set; } = new List<string>();
         public List<string> StalkerKnockoutMsgs { get; private set; } = new List<string>();
@@ -115,6 +114,7 @@ namespace StoreRobberyEnhanced
                 // MAIN SETTINGS
                 ini.WriteBool("Main Settings", "EnableMessages", true);
                 ini.WriteBool("Main Settings", "EnablePolice", true);
+                ini.WriteBool("Main Settings", "EnableBlips", true);
                 ini.WriteInt("Main Settings", "CooldownMinutes", 30);
                 ini.WriteInt("Main Settings", "RobberyTimeLimit", 180);
                 ini.WriteInt("Main Settings", "EscapeDistance", 100);
@@ -190,10 +190,26 @@ namespace StoreRobberyEnhanced
             // MAIN SETTINGS
             EnableMessages = ini.ReadBool("Main Settings", "EnableMessages", true);
             EnablePolice = ini.ReadBool("Main Settings", "EnablePolice", true);
+            EnableBlips = ini.ReadBool("Main Settings", "EnableBlips", true);
             CooldownMinutes = ini.ReadInt("Main Settings", "CooldownMinutes", 30);
             RobberyTimeLimit = ini.ReadInt("Main Settings", "RobberyTimeLimit", 180);
             EscapeDistance = ini.ReadInt("Main Settings", "EscapeDistance", 100);
 
+            // ⭐ POLICE SETTINGS
+            SilentAlarmDelaySeconds = ini.ReadInt("Police", "SilentAlarmDelaySeconds", 4);
+            ClerkCallDelaySeconds = ini.ReadInt("Police", "ClerkCallDelaySeconds", 7);
+            TimeEscalationSeconds = ini.ReadInt("Police", "TimeEscalationSeconds", 25);
+
+            // STALKER SETTINGS
+            EnableStalkerMsg = ini.ReadBool("Stalker", "EnableStalkerMsg", true);
+            EnableStalkerCall = ini.ReadBool("Stalker", "EnableStalkerCall", true);
+            StalkerCallChance = ini.ReadInt("Stalker", "StalkerCallChance", 25);
+            StalkerCallerImage = ini.ReadString("Stalker", "CallerImage", "CHAR_ARTHUR");
+            StalkerCallerName = ini.ReadString("Stalker", "CallerName", "NO CALLER ID");
+            MaxMessagesPerRobbery = ini.ReadInt("Stalker", "MaxMessagesPerRobbery", 5);
+            MessageCooldownSeconds = ini.ReadInt("Stalker", "MessageCooldownSeconds", 20);
+            StalkerMessageType = ini.ReadInt("Stalker", "MessageType", 1);
+            
             // STORE SETTINGS
             RegisterMinAmount = ini.ReadInt("Store Settings", "RegisterMinAmount", 1000);
             RegisterMaxAmount = ini.ReadInt("Store Settings", "RegisterMaxAmount", 6000);
@@ -208,22 +224,7 @@ namespace StoreRobberyEnhanced
             if (!float.TryParse(multStr, NumberStyles.Float, CultureInfo.InvariantCulture, out float mult))
                 mult = 2.0f;
             PayoutMultiplier = mult;
-
-            // ⭐ PHASE 3 LOAD
-            SilentAlarmDelaySeconds = ini.ReadInt("Police", "SilentAlarmDelaySeconds", 4);
-            ClerkCallDelaySeconds = ini.ReadInt("Police", "ClerkCallDelaySeconds", 7);
-            TimeEscalationSeconds = ini.ReadInt("Police", "TimeEscalationSeconds", 25);
-
-            // STALKER SETTINGS
-            EnableStalkerMsg = ini.ReadBool("Stalker", "EnableStalkerMsg", true);
-            EnableStalkerCall = ini.ReadBool("Stalker", "EnableStalkerCall", true);
-            StalkerCallChance = ini.ReadInt("Stalker", "StalkerCallChance", 25);
-            StalkerCallerImage = ini.ReadString("Stalker", "CallerImage", "CHAR_ARTHUR");
-            StalkerCallerName = ini.ReadString("Stalker", "CallerName", "NO CALLER ID");
-            MaxMessagesPerRobbery = ini.ReadInt("Stalker", "MaxMessagesPerRobbery", 5);
-            MessageCooldownSeconds = ini.ReadInt("Stalker", "MessageCooldownSeconds", 20);
-            StalkerMessageType = ini.ReadInt("Stalker", "MessageType", 1);
-
+            
             // TIMER UI
             TimerPosX = ini.ReadFloat("TIMER_UI", "PositionX", 0.265f);
             TimerPosY = ini.ReadFloat("TIMER_UI", "PositionY", 0.895f);
@@ -258,25 +259,16 @@ namespace StoreRobberyEnhanced
             // MAIN SETTINGS
             ini.WriteBool("Main Settings", "EnableMessages", EnableMessages);
             ini.WriteBool("Main Settings", "EnablePolice", EnablePolice);
+            ini.WriteBool("Main Settings", "EnableBlips", EnableBlips);
             ini.WriteInt("Main Settings", "CooldownMinutes", CooldownMinutes);
             ini.WriteInt("Main Settings", "RobberyTimeLimit", RobberyTimeLimit);
             ini.WriteInt("Main Settings", "EscapeDistance", EscapeDistance);
 
-            // STORE SETTINGS
-            ini.WriteInt("Store Settings", "RegisterMinAmount", RegisterMinAmount);
-            ini.WriteInt("Store Settings", "RegisterMaxAmount", RegisterMaxAmount);
-            ini.WriteInt("Store Settings", "SafeMinAmount", SafeMinAmount);
-            ini.WriteInt("Store Settings", "SafeMaxAmount", SafeMaxAmount);
-            ini.WriteBool("Store Settings", "EnableCameras", EnableCameras);
-            ini.WriteBool("Store Settings", "UseStoreNames", UseStoreNames);
-            ini.WriteInt("Store Settings", "CameraGraceSeconds", CameraGraceSeconds);
-            ini.WriteInt("Store Settings", "SafeCrackTimeSeconds", SafeCrackTimeSeconds);
-
-            // ⭐ PHASE 3 LOAD
+            // ⭐ POLCE SETTINGS
             ini.WriteInt("Police", "SilentAlarmDelaySeconds", SilentAlarmDelaySeconds);
             ini.WriteInt("Police", "ClerkCallDelaySeconds", ClerkCallDelaySeconds);
             ini.WriteInt("Police", "TimeEscalationSeconds", TimeEscalationSeconds);
-
+            
             // STALKER SETTINGS
             ini.WriteBool("Stalker", "EnableStalkerMsg", EnableStalkerMsg);
             ini.WriteBool("Stalker", "EnableStalkerCall", EnableStalkerCall);
@@ -287,6 +279,16 @@ namespace StoreRobberyEnhanced
             ini.WriteInt("Stalker", "MessageCooldownSeconds", MessageCooldownSeconds);
             ini.WriteInt("Stalker", "MessageType", StalkerMessageType);
 
+            // STORE SETTINGS
+            ini.WriteInt("Store Settings", "RegisterMinAmount", RegisterMinAmount);
+            ini.WriteInt("Store Settings", "RegisterMaxAmount", RegisterMaxAmount);
+            ini.WriteInt("Store Settings", "SafeMinAmount", SafeMinAmount);
+            ini.WriteInt("Store Settings", "SafeMaxAmount", SafeMaxAmount);
+            ini.WriteBool("Store Settings", "EnableCameras", EnableCameras);
+            ini.WriteBool("Store Settings", "UseStoreNames", UseStoreNames);
+            ini.WriteInt("Store Settings", "CameraGraceSeconds", CameraGraceSeconds);
+            ini.WriteInt("Store Settings", "SafeCrackTimeSeconds", SafeCrackTimeSeconds);            
+            
             // TIMER UI
             ini.WriteFloat("TIMER_UI", "PositionX", TimerPosX);
             ini.WriteFloat("TIMER_UI", "PositionY", TimerPosY);
@@ -399,7 +401,6 @@ namespace StoreRobberyEnhanced
             ini.WriteBool(sec, "CooldownActive", store.CooldownActive);
             ini.WriteBool(sec, "SafeCracked", store.SafeCracked);
             ini.WriteBool(sec, "AlarmTriggered", store.AlarmTriggered);
-
             ini.WriteBool(sec, "ClerkDeathHandled", store.ClerkDeathHandled);
             ini.WriteBool(sec, "ClerkKilledWithGun", store.ClerkKilledWithGun);
 
@@ -430,14 +431,12 @@ namespace StoreRobberyEnhanced
             store.CooldownActive = ini.ReadBool(sec, "CooldownActive", false);
             store.SafeCracked = ini.ReadBool(sec, "SafeCracked", false);
             store.AlarmTriggered = ini.ReadBool(sec, "AlarmTriggered", false);
-
             store.ClerkDeathHandled = ini.ReadBool(sec, "ClerkDeathHandled", false);
             store.ClerkKilledWithGun = ini.ReadBool(sec, "ClerkKilledWithGun", false);
 
             string robbedStr = ini.ReadString(sec, "LastRobbedUtc", "");
             if (DateTime.TryParse(robbedStr, null, DateTimeStyles.RoundtripKind, out DateTime robbed))
                 store.LastRobbedUtc = robbed;
-
         }
 
         // ------------------------------------------------------------

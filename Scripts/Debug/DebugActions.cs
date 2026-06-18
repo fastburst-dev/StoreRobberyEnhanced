@@ -211,7 +211,11 @@ namespace StoreRobberyEnhanced.Debug
         {
             StoreChecker();
             StoreContext.GlobalUi.ShowNotification("~b~Scenario Full Robbery");
-            _ctx.Scenarios.RunFullRobberyScenario();
+
+            if (_ctx.Scenarios != null)
+                _ctx.Scenarios.RunFullRobberyScenario();
+            else
+                StoreContext.GlobalUi.ShowNotification("~r~Scenario system not initialized.");
         }
 
         // ------------------------------------------------------------
@@ -221,7 +225,11 @@ namespace StoreRobberyEnhanced.Debug
         {
             StoreChecker();
             StoreContext.GlobalUi.ShowNotification("~b~Scenario Quick Loot");
-            _ctx.Scenarios.RunQuickLootScenario();
+
+            if (_ctx.Scenarios != null)
+                _ctx.Scenarios.RunQuickLootScenario();
+            else
+                StoreContext.GlobalUi.ShowNotification("~r~Scenario system not initialized.");
         }
 
         // ------------------------------------------------------------

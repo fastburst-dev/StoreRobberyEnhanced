@@ -105,8 +105,8 @@ namespace StoreRobberyEnhanced
                         { _ctx.Config.Action_StoreDiag, "StoreDiag" },
                         { _ctx.Config.Action_MultiPos, "MultiPos" },
                         { _ctx.Config.Action_MiscActions, "MiscActions" },
-                        { _ctx.Config.Scenario_FullRobbery, "ScenarioFullRobbery" },
-                        { _ctx.Config.Scenario_QuickLoot, "ScnearioQuickLoor" },
+                        { _ctx.Config.Scenario_FullRobbery, "Scenario_FullRobbery" },
+                        { _ctx.Config.Scenario_QuickLoot, "Scneario_QuickLoor" },
                         { _ctx.Config.Action_CameraDebug, "CameraDebug" }
                     }
                 );

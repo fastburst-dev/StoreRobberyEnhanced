@@ -123,8 +123,8 @@ namespace StoreRobberyEnhanced.Debug
                 case "StoreDiag": DebugActions.TriggerStoreDiagnostics(); break;
                 case "MultiPos": DebugActions.TriggerMultiPos(); break;
                 case "MiscAction": DebugActions.TriggerMiscActions(); break;
-                case "ScenarioFullRobbery": DebugActions.TriggerScenarioFullRobbery(); break;
-                case "ScnearioQuickLoot": DebugActions.TriggeScenarioQuickLoot(); break;
+                case "Scenario_FullRobbery": DebugActions.TriggerScenarioFullRobbery(); break;
+                case "Scneario_QuickLoot": DebugActions.TriggeScenarioQuickLoot(); break;
                 case "CameraDebug": DebugActions.ToggleCameraDebug(); break;
             }
         }

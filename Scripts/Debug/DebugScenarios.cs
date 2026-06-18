@@ -7,12 +7,14 @@ namespace StoreRobberyEnhanced.Debug
 {
     internal class DebugScenarios
     {
-        private static bool _runningScenario = false;
-        private static UiHelpers _ui;
+        private bool _runningScenario = false;
+        private readonly UiHelpers _ui;
+        private readonly StoreContext _ctx;
 
-        public static void Init(UiHelpers ui)
+        public DebugScenarios(UiHelpers ui, StoreContext ctx)
         {
             _ui = ui;
+            _ctx = ctx;
         }
 
         internal async void RunFullRobberyScenario()
@@ -30,27 +32,27 @@ namespace StoreRobberyEnhanced.Debug
             try
             {
                 DebugLogger.Info("Scenario: RobberyStart");
-                DebugActions.TriggerRobberyStart();
+                _ctx.Robberies.TryStartDebugRobbery(out _);
                 await Delay(1500);
 
                 DebugLogger.Info("Scenario: CameraAlarm");
-                DebugActions.TriggerCameraAlarm();
+                _ctx.Cameras.DebugTriggerAlarm();
                 await Delay(1500);
 
                 DebugLogger.Info("Scenario: SafeCrack");
-                DebugActions.TriggerSafeCrack();
+                _ctx.Safes.DebugForceSafeCrack(out _);
                 await Delay(2000);
 
                 DebugLogger.Info("Scenario: Escape");
-                DebugActions.TriggerEscape();
+                _ctx.Robberies.DebugForceEscape();
                 await Delay(1500);
 
                 DebugLogger.Info("Scenario: Payout");
-                DebugActions.TriggerPayout();
+                _ctx.Robberies.DebugForcePayout();
                 await Delay(1500);
 
                 DebugLogger.Info("Scenario: Cooldown");
-                DebugActions.TriggerCooldown();
+                _ctx.Cooldowns.DebugForceCooldown();
 
                 _ui.ShowNotification("~g~Full Robbery Scenario Complete");
             }
@@ -78,13 +80,13 @@ namespace StoreRobberyEnhanced.Debug
 
             try
             {
-                DebugActions.TriggerRobberyStart();
+                _ctx.Robberies.TryStartDebugRobbery(out _);
                 await Delay(1000);
 
-                DebugActions.TriggerSafeCrack();
+                _ctx.Safes.DebugForceSafeCrack(out _);
                 await Delay(1500);
 
-                DebugActions.TriggerPayout();
+                _ctx.Robberies.DebugForcePayout();
 
                 _ui.ShowNotification("~g~Quick Loot Scenario Complete");
             }

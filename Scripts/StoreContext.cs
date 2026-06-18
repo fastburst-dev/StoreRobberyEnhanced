@@ -248,11 +248,14 @@ namespace StoreRobberyEnhanced
                 Shops = new ShopSystem(this);
                 ConsumeSystem = new ShopConsumeSystem(this);
 
+                // ⭐ PATCH 3 — Initialize Debug Scenario System
+                Scenarios = new DebugScenarios(Ui, this);
+
                 // 7. Blip system
                 Blips = new BlipSystem(this);
                 Blips.Initialize();
 
-                // 8. Subsystem initialization
+                 // 8. Subsystem initialization
                 Stalker.LoadFromIni();
 
                 // 9. Apply cooldown state

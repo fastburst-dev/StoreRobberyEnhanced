@@ -47,7 +47,10 @@ namespace StoreRobberyEnhanced.Systems
 
                 // Apply blocker + blip
                 ApplyCooldownBlocker(store);
-                UpdateStoreBlip(store);
+
+                if (_ctx.Config.EnableBlips)
+                    UpdateStoreBlip(store);
+
                 _ctx.SaveStoreState(store);
 
                 _ctx.Ui.ShowNotification("~c~Cooldown forced (debug, 30s)");
@@ -368,7 +371,10 @@ namespace StoreRobberyEnhanced.Systems
                 }
 
                 RemoveCooldownBlocker(store);
-                UpdateStoreBlip(store);
+
+                if (_ctx.Config.EnableBlips)
+                    UpdateStoreBlip(store);
+
                 _ctx.SaveStoreState(store);
 
                 DebugLogger.Info($"Store {store.Id} reset complete");

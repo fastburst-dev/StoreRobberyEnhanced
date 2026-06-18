@@ -32,8 +32,16 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
-                DebugLogger.Info("BlipSystem.Initialize()");
-                CreateStoreBlips();
+                if (_ctx.Config.EnableBlips)
+                {   
+                    DebugLogger.Info("BlipSystem.Initialize()");
+                    CreateStoreBlips();
+                }
+                else
+                {
+                    DebugLogger.Info("Blips are disabled in config, skipping blip creation");
+                }
+                
             }
             catch (Exception ex)
             {
@@ -48,7 +56,8 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
-                UpdateBlipStates();
+                if(_ctx.Config.EnableBlips)
+                    UpdateBlipStates();
             }
             catch (Exception ex)
             {
