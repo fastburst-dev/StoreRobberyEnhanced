@@ -1702,6 +1702,10 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     clerk.Task.ClearAllImmediately();
 
+                    // ⭐ Move clerk slightly backward to avoid clipping into counter
+                    Vector3 backward = clerk.ForwardVector * -0.25f;   // adjust distance as needed
+                    clerk.Position += backward;
+
                     Function.Call(
                         Hash.TASK_PLAY_ANIM,
                         clerk.Handle,
