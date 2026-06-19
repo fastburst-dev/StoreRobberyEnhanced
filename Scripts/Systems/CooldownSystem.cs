@@ -33,7 +33,7 @@ namespace StoreRobberyEnhanced.Systems
                     return;
                 }
 
-                DebugLogger.Info($"Forcing 30s debug cooldown on store {store.Id}");
+                DebugLogger.Info($"[CoolDown] Forcing 30s debug cooldown on store {store.Id}");
 
                 // Simulate completed robbery state
                 store.IsRobbed = false;
@@ -58,7 +58,7 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ NEW: mark debug cooldown end time
                 store.DebugCooldownEndUtc = DateTime.UtcNow.AddSeconds(30);
 
-                DebugLogger.Info($"Debug cooldown active until {store.DebugCooldownEndUtc}");
+                DebugLogger.Info($"[CoolDown] Debug cooldown active until {store.DebugCooldownEndUtc}");
             }
             catch (Exception ex)
             {
@@ -93,7 +93,7 @@ namespace StoreRobberyEnhanced.Systems
                     RegisterDoor(store);
                 }
 
-                DebugLogger.Info("ApplyInitialState() complete");
+                DebugLogger.Info("[CoolDown] ApplyInitialState() complete");
             }
             catch (Exception ex)
             {
@@ -115,7 +115,7 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     if (DateTime.UtcNow >= store.DebugCooldownEndUtc)
                     {
-                        DebugLogger.Info($"Debug cooldown expired for store {store.Id}");
+                        DebugLogger.Info($"[CoolDown] Debug cooldown expired for store {store.Id}");
                         store.DebugCooldownEndUtc = DateTime.MinValue;
 
                         // Remove blocker + reset store state
@@ -167,7 +167,7 @@ namespace StoreRobberyEnhanced.Systems
                 // Cooldown expired → reset store
                 if (store.CooldownActive && !IsStoreInCooldown(store))
                 {
-                    DebugLogger.Info($"Cooldown expired for store {store.Id}, resetting");
+                    DebugLogger.Info($"[CoolDown] Cooldown expired for store {store.Id}, resetting");
                     ResetStore(store);
                     _ctx.Ui.ShowNotification("~g~Store reset.");
                 }
@@ -253,11 +253,11 @@ namespace StoreRobberyEnhanced.Systems
 
                     Function.Call(Hash.SET_ENTITY_AS_MISSION_ENTITY, store.CooldownBlocker.Handle, true, true);
 
-                    DebugLogger.Info($"Cooldown blocker created for store {store.Id}");
+                    DebugLogger.Info($"[CoolDown] Cooldown blocker created for store {store.Id}");
                 }
                 else
                 {
-                    DebugLogger.Info($"Cooldown blocker FAILED for store {store.Id}");
+                    DebugLogger.Info($"[CoolDown] Cooldown blocker FAILED for store {store.Id}");
                 }
             }
             catch (Exception ex)
@@ -278,7 +278,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (store.CooldownBlocker != null && store.CooldownBlocker.Exists())
                 {
                     store.CooldownBlocker.Delete();
-                    DebugLogger.Info($"Cooldown blocker removed for store {store.Id}");
+                    DebugLogger.Info($"[CoolDown] Cooldown blocker removed for store {store.Id}");
                 }
             }
             catch (Exception ex)
@@ -308,7 +308,7 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     store.DoorSystemId = store.Id + 10000;
 
-                    DebugLogger.Info($"Adding door to system: ID={store.DoorSystemId}");
+                    DebugLogger.Info($"[CoolDown] Adding door to system: ID={store.DoorSystemId}");
 
                     Function.Call(Hash.ADD_DOOR_TO_SYSTEM,
                         store.DoorSystemId,
@@ -359,7 +359,7 @@ namespace StoreRobberyEnhanced.Systems
 
                     if (store.CooldownBlocker == null || !store.CooldownBlocker.Exists())
                     {
-                        DebugLogger.Info($"Cooldown blocker missing for store {store.Id}, reapplying");
+                        DebugLogger.Info($"[CoolDown] Cooldown blocker missing for store {store.Id}, reapplying");
                         ApplyCooldownBlocker(store);
                     }
                 }
@@ -413,7 +413,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 _ctx.SaveStoreState(store);
 
-                DebugLogger.Info($"Store {store.Id} reset complete");
+                DebugLogger.Info($"[ResetStore] Store {store.Id} reset complete");
             }
             catch (Exception ex)
             {
@@ -432,13 +432,13 @@ namespace StoreRobberyEnhanced.Systems
 
                 if (!_ctx.StoreBlips.TryGetValue(store.Id, out Blip blip))
                 {
-                    DebugLogger.Info($"Store {store.Id} has no blip entry");
+                    DebugLogger.Info($"[CoolDown] Store {store.Id} has no blip entry");
                     return;
                 }
 
                 if (blip == null || !blip.Exists())
                 {
-                    DebugLogger.Info($"Store {store.Id} blip missing or deleted");
+                    DebugLogger.Info($"[CoolDown] Store {store.Id} blip missing or deleted");
                     return;
                 }
 

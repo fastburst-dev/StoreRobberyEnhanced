@@ -24,7 +24,7 @@ namespace StoreRobberyEnhanced.Systems
             try
             {
                 _ctx = ctx;
-                DebugLogger.Info("ShopConsumeSystem initialized");
+                DebugLogger.Info("[SHOP] ShopConsumeSystem initialized");
             }
             catch (Exception ex)
             {
@@ -38,7 +38,7 @@ namespace StoreRobberyEnhanced.Systems
             try
             {
                 _queue.Enqueue(itemId);
-                DebugLogger.Info($"ShopConsumeSystem: Queued item '{itemId}'");
+                DebugLogger.Info($"[SHOP] ShopConsumeSystem: Queued item '{itemId}'");
             }
             catch (Exception ex)
             {
@@ -113,7 +113,7 @@ namespace StoreRobberyEnhanced.Systems
                     return;
                 }
 
-                DebugLogger.Info($"ShopConsumeSystem: Consuming '{itemId}'");
+                DebugLogger.Info($"[SHOP] ShopConsumeSystem: Consuming '{itemId}'");
 
                 // ------------------------------------------------------------
                 // LOAD ANIMATION
@@ -167,7 +167,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 if (cancelled)
                 {
-                    DebugLogger.Info("ShopConsumeSystem: Consumption cancelled.");
+                    DebugLogger.Info("[SHOP] ShopConsumeSystem: Consumption cancelled.");
                     return;
                 }
 

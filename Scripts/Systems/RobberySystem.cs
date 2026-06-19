@@ -72,7 +72,7 @@ namespace StoreRobberyEnhanced.Systems
                     return false;
                 }
 
-                DebugLogger.Info($"Debug robbery started at store {store.Id}");
+                DebugLogger.Info($"[ROBBERY] DebugRobbery: robbery started at store {store.Id}");
                 StartRegisterRobbery(store);
 
                 msg = store.Name;
@@ -150,7 +150,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (store.PendingPayout <= 0)
                     store.PendingPayout = _ctx.Rng.Next(2500, 50000);
 
-                DebugLogger.Info($"DebugForceEscape armed for store {store.Id}");
+                DebugLogger.Info($"[ROBBERY] DebugForceEscape: armed for store {store.Id}");
             }
             catch (Exception ex)
             {
@@ -204,7 +204,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (store.PendingPayout <= 0)
                     store.PendingPayout = _ctx.Rng.Next(2500, 50000);
 
-                DebugLogger.Info($"DebugForcePayout: awarding payout + cooldown for store {store.Id}");
+                DebugLogger.Info($"[ROBBERY] DebugForcePayout: awarding payout + cooldown for store {store.Id}");
 
                 int payout = store.PendingPayout;
 
@@ -321,7 +321,7 @@ namespace StoreRobberyEnhanced.Systems
             // ⭐ Remove any existing cooldown blocker before creating a new one
             _ctx.Cooldowns.RemoveCooldownBlocker(store);
 
-            DebugLogger.Info($"DebugResetStore: store {store.Id} fully reset");
+            DebugLogger.Info($"[ROBBERY] DebugResetStore: store {store.Id} fully reset");
 
             // ------------------------------------------------------------
             // ⭐ SAVE CLEAN STATE
@@ -380,7 +380,7 @@ namespace StoreRobberyEnhanced.Systems
                         store.LootBag.Delete();
                         store.LootBag = null;
 
-                        DebugLogger.Info($"Player picked up loot bag at store {store.Id}");
+                        DebugLogger.Info($"[ROBBERY] Player picked up loot bag at store {store.Id}");
 
                         // Bag pickup does NOT pay immediately — payout is handled by PendingPayout
                         _ctx.Ui.ShowNotification("~g~Loot bag collected!");
@@ -535,7 +535,7 @@ namespace StoreRobberyEnhanced.Systems
 
                     if (remaining < 0)
                     {
-                        DebugLogger.Info("Debug timer expired — showing heist banner");
+                        DebugLogger.Info("[ROBBERY] Debug timer expired — showing heist banner");
 
                         _testTimerActive = false;
                         StoreContext.GlobalUi.ClearTimer();
@@ -605,7 +605,7 @@ namespace StoreRobberyEnhanced.Systems
 
                             if (pressedInteract)
                             {
-                                DebugLogger.Info($"[PATCH N] Starting SafeCrack (SILENT) at store {store.Id}");
+                                DebugLogger.Info($"[SafeCrack] Starting SafeCrack (SILENT) at store {store.Id}");
                                 _ctx.SafeCrack.Start(store, store.SafePos, store.SafeHeading, player);
                             }
                         }
@@ -636,7 +636,7 @@ namespace StoreRobberyEnhanced.Systems
 
                         if (pressedInteract)
                         {
-                            DebugLogger.Info($"[PATCH N] Starting SafeCrack (LOUD) at store {store.Id}");
+                            DebugLogger.Info($"[SafeCrack] Starting SafeCrack (LOUD) at store {store.Id}");
                             _ctx.SafeCrack.Start(store, store.SafePos, store.SafeHeading, player);
                         }
                     }
@@ -743,7 +743,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 if (canSilentRob)
                 {
-                    DebugLogger.Info($"SilentRobbery activated at store {store.Id}");
+                    DebugLogger.Info($"[ROBBERY] SilentRobbery activated at store {store.Id}");
 
                     store.SilentRobbery = true;
                     store.IsRobberyActive = true;
@@ -776,7 +776,7 @@ namespace StoreRobberyEnhanced.Systems
 
                     store.HeatLevel = 0;
 
-                    DebugLogger.Info($"SilentRobbery HARD LOCK activated for store {store.Id}");
+                    DebugLogger.Info($"[ROBBERY] SilentRobbery HARD LOCK activated for store {store.Id}");
 
                     Task.Run(async () =>
                     {
@@ -828,7 +828,7 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 store.PlayerMaskedAtStart = _ctx.Player.IsMasked();
 
-                DebugLogger.Info($"Robbery started at store {store.Id}");
+                DebugLogger.Info($"[ROBBERY] Robbery started at store {store.Id}");
 
                 // ------------------------------------------------------------
                 // ⭐ SAFECRACK STEALTH SUPPRESSION (PATCHED)
@@ -909,7 +909,7 @@ namespace StoreRobberyEnhanced.Systems
                 payout = (int)(payout * _ctx.Config.PayoutMultiplier);
                 store.PendingPayout += payout;
 
-                DebugLogger.Info($"Register robbery payout: store={store.Id}, payout={payout}");
+                DebugLogger.Info($"[ROBBERY] Register robbery payout: store={store.Id}, payout={payout}");
 
                 // Subtitle #1
                 _ctx.Ui.ShowSubtitle("Rob the store and escape.", 3000);
@@ -1012,7 +1012,7 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 if (remaining <= 0)
                 {
-                    DebugLogger.Info($"Robbery timer expired for store {store.Id}");
+                    DebugLogger.Info($"[TIMER] Robbery timer expired for store {store.Id}");
 
                     // Only trigger timer-based police if NO other alarm fired
                     if (!store.AlarmTriggered)
@@ -1211,7 +1211,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 if (!bagModel.IsValid || !bagModel.Request(2000))
                 {
-                    DebugLogger.Warn($"[PATCH K] Failed to load trash bag model for store {store.Id}. Blocked.");
+                    DebugLogger.Warn($"[ROBBERY] Failed to load trash bag model for store {store.Id}. Blocked.");
                     return;
                 }
 
@@ -1230,7 +1230,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 if (bag == null || !bag.Exists())
                 {
-                    DebugLogger.Warn($"[PATCH K] Bag spawn failed for store {store.Id}.");
+                    DebugLogger.Warn($"[ROBBERY] Bag spawn failed for store {store.Id}.");
                     return;
                 }
 
@@ -1240,7 +1240,7 @@ namespace StoreRobberyEnhanced.Systems
                 // Store reference
                 store.LootBag = bag;
 
-                DebugLogger.Info($"[PATCH K] Spawned BLACK TRASH BAG for store {store.Id} at {dropPos}");
+                DebugLogger.Info($"[ROBBERY] Spawned BLACK TRASH BAG for store {store.Id} at {dropPos}");
             }
             catch (Exception ex)
             {
@@ -1326,7 +1326,7 @@ namespace StoreRobberyEnhanced.Systems
                         return;
                     }
 
-                    DebugLogger.Info($"Debug escape success at store {store.Id}");
+                    DebugLogger.Info($"[ROBBERY] Debug escape success at store {store.Id}");
 
                     // ⭐ FULL STATE RESET
                     store.RobberyEnded = true;
@@ -1375,7 +1375,7 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ Early escape success
                 if (dist > _ctx.Config.EscapeDistance && allCamsDown)
                 {
-                    DebugLogger.Info($"Early escape success at store {store.Id}");
+                    DebugLogger.Info($"[ROBBERY] Early escape success at store {store.Id}");
 
                     // ⭐ FULL STATE RESET
                     store.RobberyEnded = true;
@@ -1475,7 +1475,7 @@ namespace StoreRobberyEnhanced.Systems
                     return;
                 }
 
-                DebugLogger.Info($"Robbery completion triggered for store {store.Id}");
+                DebugLogger.Info($"[ROBBERY] Robbery completion triggered for store {store.Id}");
 
                 // ------------------------------------------------------------
                 // ⭐ CRITICAL FIX — STOP TIMER + STOP ALL ROBBERY LOGIC
@@ -1518,7 +1518,7 @@ namespace StoreRobberyEnhanced.Systems
                 // Instead of paying the player, record the collected amount
                 store.CollectedPayout += payout;
 
-                DebugLogger.Info($"[PATCH11] Collected payout of ${payout} for store {store.Id} (awaiting successful escape)");
+                DebugLogger.Info($"[ROBBERY] Collected payout of ${payout} for store {store.Id} (awaiting successful escape)");
 
                 // Reset pending payout so it isn't double-counted
                 store.PendingPayout = 0;
@@ -1564,7 +1564,7 @@ namespace StoreRobberyEnhanced.Systems
                 }
                 else
                 {
-                    DebugLogger.Info($"Awarding payout: store={store.Id}, payout={payout}, DebugState={wasDebugEscape}");
+                    DebugLogger.Info($"[ROBBERY] Awarding payout: store={store.Id}, payout={payout}, DebugState={wasDebugEscape}");
                     _ctx.Ui.ShowNotification("~y~DEBUG STATE ESCAPE COMPLETED~n~(no actual payout).");
                     StoreContext.GlobalUi.ShowHeistPassedBanner("~o~MISSION COMPLETE", $"{payout}", $"{store.Name}");
 
@@ -1698,7 +1698,7 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     // ⭐ REQUIRED — ensures clean test state for next debug run
                     DebugResetStore(store);
-                    DebugLogger.Info($"Debug State cleared after cooldown: store={store.Id}");
+                    DebugLogger.Info($"[ROBBERY] Debug State cleared after cooldown: store={store.Id}");
 
                     // Clear debug escape state
                     _debugEscapeActive = false;

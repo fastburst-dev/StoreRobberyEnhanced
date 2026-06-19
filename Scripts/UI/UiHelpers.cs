@@ -143,7 +143,7 @@ namespace StoreRobberyEnhanced.UI
         {
             try
             {
-                DebugLogger.Info($"ShowHeistPassedBanner: {title} / {subtitle} / {storeName}");
+                DebugLogger.Info($"[BANNER] ShowHeistPassedBanner: {title} / {subtitle} / {storeName}");
 
                 // If storeName is provided, build the two-line subtitle
                 string finalSubtitle;

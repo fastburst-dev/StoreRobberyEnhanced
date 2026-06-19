@@ -735,7 +735,7 @@ namespace StoreRobberyEnhanced.Systems
             // If clerk is ragdolled → recover safely
             if (clerk.IsRagdoll)
             {
-                DebugLogger.Warn($"[PATCH P] Clerk ragdolled at store {store.Id}. Resetting to stall.");
+                DebugLogger.Warn($"[ANIM] Clerk ragdolled at store {store.Id}. Resetting to stall.");
 
                 ClearAllClerkPhases(store);
                 store.ClerkStalling = true;
@@ -955,7 +955,7 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ PLAYER NOTIFICATION
                 _ctx.Ui.ShowNotification("~y~Clerk quietly hands over the register cash.~s~ Crack the safe before leaving.");
                 
-                DebugLogger.Info($"Played silent robbery anim for store {store.Id} on clerk {clerk.Handle}");
+                DebugLogger.Info($"[ANIM] Played silent robbery anim for store {store.Id} on clerk {clerk.Handle}");
             }
             catch (Exception ex)
             {
@@ -1168,7 +1168,7 @@ namespace StoreRobberyEnhanced.Systems
 
                     _ctx.Ui.ShowNotification("~r~The clerk has decided to fight back!~s~");
 
-                    DebugLogger.Info($"Clerk at store {store.Id} decided to fight back ({store.ReactionType})");
+                    DebugLogger.Info($"[ANIM] Clerk at store {store.Id} decided to fight back ({store.ReactionType})");
 
                     // Trigger combat behavior immediately
                     ProcessFeelingFroggy(store, clerk);
@@ -1609,7 +1609,7 @@ namespace StoreRobberyEnhanced.Systems
                 SetClerkPhase(store, ClerkPhase.Flee);
                 store.ClerkSurrenderStage = 0;
                 store.ClerkFleeing = true;
-                DebugLogger.Info($"Store Surrender State {store.ClerkSurrenderStage} and clerk flee status {store.ClerkFleeing}.");
+                DebugLogger.Info($"[ANIM] Store Surrender State {store.ClerkSurrenderStage} and clerk flee status {store.ClerkFleeing}.");
 
                 // Set timer for next phase
                 store.ClerkAnimStartUtc = DateTime.UtcNow;
@@ -2122,7 +2122,7 @@ namespace StoreRobberyEnhanced.Systems
                 // Speech
                 SafePlaySpeech(clerk, _speech.Get("SilentAlarm"), "SPEECH_PARAMS_FORCE");
 
-                DebugLogger.Info($"Silent alarm triggered at store {store.Id}");
+                DebugLogger.Info($"[ALARM] Silent alarm triggered at store {store.Id}");
             }
             catch (Exception ex)
             {
@@ -2202,7 +2202,7 @@ namespace StoreRobberyEnhanced.Systems
 
                         SafePlaySpeech(clerk, _speech.Get("SilentAlarm"), "SPEECH_PARAMS_FORCE");
 
-                        DebugLogger.Info($"Police called for robbery at store {store.Id}");
+                        DebugLogger.Info($"[ALARM] Police called for robbery at store {store.Id}");
                     }
                 }
             }

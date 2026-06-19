@@ -27,29 +27,29 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ Suppress debug camera alarm during SafeCrack
                 if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
                 {
-                    DebugLogger.Info("DebugTriggerAlarm() suppressed — SafeCrack active");
+                    DebugLogger.Info("[CameraSystem] DebugTriggerAlarm() suppressed — SafeCrack active");
                     _ctx.Ui.ShowNotification("~y~Camera alarm suppressed (SafeCrack active)");
                     return;
                 }
 
-                DebugLogger.Info("DebugTriggerAlarm() called");
+                DebugLogger.Info("[CameraSystem] DebugTriggerAlarm() called");
 
                 var store = _ctx.GetNearestStore();
                 if (store == null)
                 {
-                    DebugLogger.Info("No store nearby for DebugTriggerAlarm");
+                    DebugLogger.Info("[CameraSystem] No store nearby for DebugTriggerAlarm");
                     _ctx.Ui.ShowNotification("~r~No store nearby");
                     return;
                 }
 
                 if (store.AlarmTriggered)
                 {
-                    DebugLogger.Info($"Store {store.Id} alarm already triggered");
+                    DebugLogger.Info($"[CameraSystem] Store {store.Id} alarm already triggered");
                     _ctx.Ui.ShowNotification("~y~Alarm already triggered");
                     return;
                 }
 
-                DebugLogger.Info($"Triggering camera alarm for store {store.Id}");
+                DebugLogger.Info($"[CameraSystem] Triggering camera alarm for store {store.Id}");
                 TriggerCameraFlag(store);
 
                 _ctx.Ui.ShowNotification("~r~Camera alarm triggered (debug)");
@@ -227,7 +227,7 @@ namespace StoreRobberyEnhanced.Systems
                     // ------------------------------------------------------------
                     if (PlayerDestroyedCamera(cam, player))
                     {
-                        DebugLogger.Info($"Interior camera destroyed at {cam.Position} for store {store.Id}");
+                        DebugLogger.Info($"[CameraSystem] Interior camera destroyed at {cam.Position} for store {store.Id}");
 
                         cam.Delete();
 
@@ -271,7 +271,7 @@ namespace StoreRobberyEnhanced.Systems
                                 if (elapsed >= nearest.GraceDurationSeconds)
                                 {
                                     DebugLogger.Info(
-                                        $"Interior camera alarm triggered after grace for store {store.Id}"
+                                        $"[CameraSystem] Interior camera alarm triggered after grace for store {store.Id}"
                                     );
 
                                     nearest.GraceActive = false;
@@ -386,7 +386,7 @@ namespace StoreRobberyEnhanced.Systems
                         cam.Destroyed = true;
                         cam.GraceActive = false;
 
-                        DebugLogger.Info($"Fallback camera {i} destroyed by player for store {store.Id}");
+                        DebugLogger.Info($"[CameraSystem] Fallback camera {i} destroyed by player for store {store.Id}");
                         continue;
                     }
 
@@ -432,7 +432,7 @@ namespace StoreRobberyEnhanced.Systems
                             if (elapsed >= cam.GraceDurationSeconds)
                             {
                                 DebugLogger.Info(
-                                    $"Fallback camera {i} alarm triggered after grace for store {store.Id}"
+                                    $"[CameraSystem] Fallback camera {i} alarm triggered after grace for store {store.Id}"
                                 );
 
                                 // ⭐ ONE-SHOT ALARM — prevent spam
@@ -488,7 +488,7 @@ namespace StoreRobberyEnhanced.Systems
 
                     if (ray.DidHit && ray.HitEntity != null && ray.HitEntity.Handle == cam.Handle)
                     {
-                        DebugLogger.Info("Interior camera destroyed by gunfire");
+                        DebugLogger.Info("[CameraSystem] Interior camera destroyed by gunfire");
                         return true;
                     }
                 }
@@ -496,7 +496,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (player.Position.DistanceTo(cam.Position) < 2f &&
                     Game.IsControlJustPressed(Control.Attack))
                 {
-                    DebugLogger.Info("Interior camera destroyed by melee");
+                    DebugLogger.Info("[CameraSystem] Interior camera destroyed by melee");
                     return true;
                 }
 
@@ -523,7 +523,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 if (dist < 2.0f && Game.IsControlJustPressed(Control.Attack))
                 {
-                    DebugLogger.Info("Fallback camera destroyed by melee");
+                    DebugLogger.Info("[CameraSystem] Fallback camera destroyed by melee");
                     return true;
                 }
 
@@ -642,7 +642,7 @@ namespace StoreRobberyEnhanced.Systems
                 // No MaxHeat config → just increment safely
                 store.HeatLevel += 1;
 
-                DebugLogger.Info($"Camera alarm triggered for store {store.Id}, heat={store.HeatLevel}");
+                DebugLogger.Info($"[CameraSystem] Camera alarm triggered for store {store.Id}, heat={store.HeatLevel}");
             }
             catch (Exception ex)
             {

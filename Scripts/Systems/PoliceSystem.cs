@@ -155,7 +155,7 @@ namespace StoreRobberyEnhanced.Systems
                     if (elapsed >= cam.GraceDurationSeconds)
                     {
                         DebugLogger.Info(
-                            $"Camera alarm triggered at {store.Name} after grace period ({elapsed:0.0}s >= {cam.GraceDurationSeconds}s)"
+                            $"[PoliceSystem] Camera alarm triggered at {store.Name} after grace period ({elapsed:0.0}s >= {cam.GraceDurationSeconds}s)"
                         );
 
                         TriggerPolice(store, 2, "~r~Camera detected suspicious activity!");
@@ -234,7 +234,7 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 // ⭐ Trigger appropriate police escalation
                 // ------------------------------------------------------------
-                DebugLogger.Info($"Clerk death alarm at {store.Name}, killedWithGun={store.ClerkKilledWithGun}");
+                DebugLogger.Info($"[PoliceSystem] Clerk death alarm at {store.Name}, killedWithGun={store.ClerkKilledWithGun}");
 
                 if (store.ClerkKilledWithGun)
                     TriggerPolice(store, 3, "~r~Clerk shot! Police alerted!");
@@ -310,7 +310,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 if (elapsed >= _ctx.Config.SilentAlarmDelaySeconds)
                 {
-                    DebugLogger.Info($"Silent alarm triggered at {store.Name}");
+                    DebugLogger.Info($"[PoliceSystem] Silent alarm triggered at {store.Name}");
                     TriggerPolice(store, 1, "~y~Silent alarm triggered!");
                 }
             }
@@ -382,7 +382,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 if (elapsed >= _ctx.Config.ClerkCallDelaySeconds)
                 {
-                    DebugLogger.Info($"Clerk called police at {store.Name}");
+                    DebugLogger.Info($"[PoliceSystem] Clerk called police at {store.Name}");
                     TriggerPolice(store, 2, "~r~Clerk called the police!");
                 }
             }
@@ -413,13 +413,13 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     store.HeatLevel += 2;
                     store.RepeatRobberyEscalationApplied = true;
-                    DebugLogger.Info($"Repeat robbery escalation (+2 heat) at {store.Name}");
+                    DebugLogger.Info($"[PoliceSystem] Repeat robbery escalation (+2 heat) at {store.Name}");
                 }
                 else if (store.TimesRobbed >= 2)
                 {
                     store.HeatLevel += 1;
                     store.RepeatRobberyEscalationApplied = true;
-                    DebugLogger.Info($"Repeat robbery escalation (+1 heat) at {store.Name}");
+                    DebugLogger.Info($"[PoliceSystem] Repeat robbery escalation (+1 heat) at {store.Name}");
                 }
             }
             catch (Exception ex)
@@ -453,7 +453,7 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     store.HeatLevel += 1;
                     store.MaskEscalationApplied = true;
-                    DebugLogger.Info($"Mask escalation (+1 heat) at {store.Name}");
+                    DebugLogger.Info($"[PoliceSystem] Mask escalation (+1 heat) at {store.Name}");
                 }
             }
             catch (Exception ex)
@@ -481,7 +481,7 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     store.HeatLevel += 1;
                     store.FightEscalationApplied = true;
-                    DebugLogger.Info($"Fight escalation (+1 heat) at {store.Name}");
+                    DebugLogger.Info($"[PoliceSystem] Fight escalation (+1 heat) at {store.Name}");
                 }
             }
             catch (Exception ex)
@@ -516,7 +516,7 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     store.HeatLevel += 1;
                     store.TimeEscalationApplied = true;
-                    DebugLogger.Info($"Time escalation (+1 heat) at {store.Name}");
+                    DebugLogger.Info($"[PoliceSystem] Time escalation (+1 heat) at {store.Name}");
                 }
             }
             catch (Exception ex)
@@ -545,7 +545,7 @@ namespace StoreRobberyEnhanced.Systems
                     store.HeatLevel += 1;
                     store.ClerkRecognizedPlayer = false;
 
-                    DebugLogger.Info($"Recognition escalation (+1 heat) at {store.Name}");
+                    DebugLogger.Info($"[PoliceSystem] Recognition escalation (+1 heat) at {store.Name}");
                 }
             }
             catch (Exception ex)
@@ -666,7 +666,7 @@ namespace StoreRobberyEnhanced.Systems
                 _ctx.GlobalHeatLevel += 1;
 
                 DebugLogger.Info(
-                    $"TriggerPolice: store={store.Name}, wanted={wantedLevel}, heat={store.HeatLevel}, globalHeat={_ctx.GlobalHeatLevel}"
+                    $"[PoliceSystem] TriggerPolice: store={store.Name}, wanted={wantedLevel}, heat={store.HeatLevel}, globalHeat={_ctx.GlobalHeatLevel}"
                 );
 
                 // ⭐ Persist state

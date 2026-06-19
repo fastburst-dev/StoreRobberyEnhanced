@@ -292,7 +292,7 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
-                DebugLogger.Info("DebugForceStalkerCall() invoked");
+                DebugLogger.Info("[TEXT] DebugForceStalkerCall() invoked");
                 _ctx.Ui.ShowNotification("~y~Debug: Forcing stalker phone call");
                 StartCall();
             }
@@ -309,13 +309,13 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
-                DebugLogger.Info("DebugForceStalker() called");
+                DebugLogger.Info("[TEXT] DebugForceStalker() called");
 
                 List<string> pool = _robberyMsgs;
 
                 if (pool == null || pool.Count == 0)
                 {
-                    DebugLogger.Info("No stalker messages loaded");
+                    DebugLogger.Info("[TEXT] No stalker messages loaded");
                     _ctx.Ui.ShowNotification("~r~No stalker messages loaded");
                     return;
                 }
@@ -329,7 +329,7 @@ namespace StoreRobberyEnhanced.Systems
                     msg, _messageType
                 );
 
-                DebugLogger.Info("Forced stalker message sent");
+                DebugLogger.Info("[TEXT] Forced stalker message sent");
                 _ctx.Ui.ShowNotification("~r~Stalker message forced (debug)");
             }
             catch (Exception ex)
@@ -345,7 +345,7 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
-                DebugLogger.Info("Loading stalker messages from INI");
+                DebugLogger.Info("[TEXT] Loading stalker messages from INI");
 
                 IniConfig ini = _ctx.Config;
 
@@ -367,7 +367,7 @@ namespace StoreRobberyEnhanced.Systems
                 else
                     _stalkerContact.Name = "Unknown Caller";
 
-                DebugLogger.Info("Stalker messages loaded");
+                DebugLogger.Info("[TEXT] Stalker messages loaded");
             }
             catch (Exception ex)
             {
@@ -521,7 +521,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 string msg = pool[_rng.Next(pool.Count)];
 
-                DebugLogger.Info($"Sending stalker message: {msg}");
+                DebugLogger.Info($"[TEXT] Sending stalker message: {msg}");
 
                 _ctx.Ui.TextNotification(
                     _callerImage,
@@ -582,7 +582,7 @@ namespace StoreRobberyEnhanced.Systems
                 _callsThisRobbery++;
                 _nextAllowedCallTimeMs = Game.GameTime + 15000; // 15s cooldown
 
-                DebugLogger.Info($"Stalker call triggered (iFruit), call #{_callsThisRobbery}");
+                DebugLogger.Info($"[TEXT] Stalker call triggered (iFruit), call #{_callsThisRobbery}");
                 StartCall();
             }
             catch (Exception ex)
@@ -596,11 +596,11 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
-                DebugLogger.Info("Starting stalker iFruit call");
+                DebugLogger.Info("[TEXT] Starting stalker iFruit call");
 
                 if (_stalkerContact == null || !_stalkerContact.Active)
                 {
-                    DebugLogger.Info("Stalker contact not active or null");
+                    DebugLogger.Info("[TEXT] Stalker contact not active or null");
                     return;
                 }
 
@@ -624,7 +624,7 @@ namespace StoreRobberyEnhanced.Systems
                 // If still ringing after timeout, end the call manually
                 if (_stalkerContact != null && _stalkerContact.Active)
                 {
-                    DebugLogger.Info("Stalker call timed out — ending call");
+                    DebugLogger.Info("[TEXT] Stalker call timed out — ending call");
                     _stalkerContact.EndCall();
                     CleanupPhone();
                 }
@@ -644,7 +644,7 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
-                DebugLogger.Info("Stalker call answered (iFruit)");
+                DebugLogger.Info("[TEXT] Stalker call answered (iFruit)");
                 QueueMessage(_callAnsweredMsgs);
 
                 // Cleanup phone model + camera
@@ -693,7 +693,7 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
-                DebugLogger.Info("Resetting stalker system for new robbery");
+                DebugLogger.Info("[TEXT] Resetting stalker system for new robbery");
 
                 _messagesSentThisRobbery = 0;
                 _nextAllowedMessageTime = DateTime.MinValue;

@@ -23,7 +23,7 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
-                DebugLogger.Info("DebugForceSafeCrack() called — using NEW SafeCrack system");
+                DebugLogger.Info("[SafeCrack] DebugForceSafeCrack() called — using NEW SafeCrack system");
 
                 var store = _ctx.GetNearestStore();
                 if (store == null)
@@ -36,7 +36,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (!store.IsRobberyActive)
                 {
                     store.IsRobberyActive = true;
-                    DebugLogger.Info("Robbery was not active — activating now");
+                    DebugLogger.Info("[SafeCrack] Robbery was not active — activating now");
                 }
 
                 if (store.SafeCracked)
@@ -53,7 +53,7 @@ namespace StoreRobberyEnhanced.Systems
                 store.SilentAlarmPressed = false;
 
                 // Simulate instant success
-                DebugLogger.Info("Simulating SafeCrack instant success...");
+                DebugLogger.Info("[SafeCrack] Simulating SafeCrack instant success...");
 
                 int min = _ctx.Config.SafeMinAmount;
                 int max = _ctx.Config.SafeMaxAmount;
@@ -62,13 +62,13 @@ namespace StoreRobberyEnhanced.Systems
                 int baseReward = _ctx.Rng.Next(min, max + 1);
                 int finalReward = (int)(baseReward * multiplier);
 
-                DebugLogger.Info($"Simulated crack: base={baseReward}, multiplier={multiplier}, final={finalReward}");
+                DebugLogger.Info($"[SafeCrack] Simulated crack: base={baseReward}, multiplier={multiplier}, final={finalReward}");
 
                 store.SafeCracked = true;
                 store.PendingPayout += finalReward;
                 store.PendingCompletion = true;
 
-                DebugLogger.Info($"Debug safe crack complete: store={store.Id}, reward={finalReward}");
+                DebugLogger.Info($"[SafeCrack] Debug safe crack complete: store={store.Id}, reward={finalReward}");
 
                 _ctx.SaveStoreState(store);
 
@@ -95,7 +95,7 @@ namespace StoreRobberyEnhanced.Systems
             {
                 _ctx.DebugModeSafeCrack = true;
 
-                DebugLogger.Info("DebugStartSafeCrack() called — launching REAL SafeCrack minigame");
+                DebugLogger.Info("[SafeCrack] DebugStartSafeCrack() called — launching REAL SafeCrack minigame");
 
                 if (_ctx.SafeCrack == null || _ctx.SafeState == null)
                 {
