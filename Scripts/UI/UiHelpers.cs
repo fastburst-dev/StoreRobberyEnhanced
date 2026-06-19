@@ -542,6 +542,17 @@ namespace StoreRobberyEnhanced.UI
             {
                 _instructionalButtons = new Scaleform("INSTRUCTIONAL_BUTTONS");
 
+                // ⭐ WAIT FOR SCALEFORM TO LOAD (CRITICAL)
+                int timeout = Game.GameTime + 2000;
+                while (!_instructionalButtons.IsLoaded && Game.GameTime < timeout)
+                    Script.Yield();
+
+                if (!_instructionalButtons.IsLoaded)
+                {
+                    DebugLogger.Warn("InstructionalButtons scaleform failed to load in time.");
+                    return;
+                }
+
                 _instructionalButtons.CallFunction("CLEAR_ALL");
                 _instructionalButtons.CallFunction("TOGGLE_MOUSE_BUTTONS", 0);
 
@@ -571,11 +582,10 @@ namespace StoreRobberyEnhanced.UI
                 _instructionalButtons.CallFunction("SET_BACKGROUND_COLOUR", 0, 0, 0, 80);
                 _instructionalButtons.CallFunction("SET_POSITION", 0.50f, 0.95f);
 
-                // ⭐ FIX — allow scaleform to initialize before first render
+                // ⭐ SECOND YIELD — allow SET_DATA_SLOT to apply
                 Script.Yield();
 
                 _instructionalButtons.CallFunction("DRAW_INSTRUCTIONAL_BUTTONS", -1);
-
             }
             catch (Exception ex)
             {
