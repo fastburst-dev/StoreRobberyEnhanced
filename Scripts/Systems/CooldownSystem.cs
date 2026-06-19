@@ -108,7 +108,9 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
+                // ------------------------------------------------------------
                 // ⭐ DEBUG COOLDOWN HANDLING
+                // ------------------------------------------------------------
                 if (store.DebugCooldownEndUtc != DateTime.MinValue)
                 {
                     if (DateTime.UtcNow >= store.DebugCooldownEndUtc)
@@ -116,8 +118,36 @@ namespace StoreRobberyEnhanced.Systems
                         DebugLogger.Info($"Debug cooldown expired for store {store.Id}");
                         store.DebugCooldownEndUtc = DateTime.MinValue;
 
+                        // Remove blocker + reset store state
                         RemoveCooldownBlocker(store);
                         ResetStore(store);
+
+                        // ------------------------------------------------------------
+                        // ⭐ FULL CLERK RESET (matches abandon logic)
+                        // ------------------------------------------------------------
+                        if (store.Clerk != null && store.Clerk.Exists())
+                        {
+                            store.Clerk.Delete();
+                            store.Clerk = null;
+                        }
+
+                        if (store.DummyClerk != null && store.DummyClerk.Exists())
+                        {
+                            store.DummyClerk.Delete();
+                            store.DummyClerk = null;
+                        }
+
+                        store.ClerkDeathHandled = false;
+                        store.ClerkDeathHandledCheck = false;
+                        store.ClerkKilledWithGun = false;
+                        store.ClerkReacted = false;
+                        store.ClerkSurrender = false;
+                        store.ClerkSurrenderStage = 0;
+                        store.ClerkPanicking = false;
+
+                        // ⭐ Force replacement system to run again
+                        store.DefaultClerkRemoved = false;
+
                         _ctx.Ui.ShowNotification("~g~Debug cooldown expired — store reset");
                     }
                     else
@@ -129,8 +159,12 @@ namespace StoreRobberyEnhanced.Systems
                     return;
                 }
 
+                // ------------------------------------------------------------
+                // ⭐ NORMAL COOLDOWN HANDLING
+                // ------------------------------------------------------------
                 DebugLogger.Trace($"UpdateStoreCooldown({store.Id})");
 
+                // Cooldown expired → reset store
                 if (store.CooldownActive && !IsStoreInCooldown(store))
                 {
                     DebugLogger.Info($"Cooldown expired for store {store.Id}, resetting");
@@ -138,6 +172,7 @@ namespace StoreRobberyEnhanced.Systems
                     _ctx.Ui.ShowNotification("~g~Store reset.");
                 }
 
+                // Still cooling down → enforce lockout
                 if (store.CooldownActive)
                 {
                     DebugLogger.Trace($"Store {store.Id} still cooling down → enforcing lockout");
@@ -360,6 +395,7 @@ namespace StoreRobberyEnhanced.Systems
                 store.StallDurationMs = 0;
                 store.ClerkSurrenderStage = 0;
                 store.IsRobberyActive = false;
+                store.RobberyCompleted = false;
                 _ctx.SetRobberyActive(false);
 
                 // ⭐ DO NOT DELETE THE CLERK HERE

@@ -7,6 +7,7 @@ using StoreRobberyEnhanced.Debug;
 using StoreRobberyEnhanced.Systems;
 using StoreRobberyEnhanced.UI;
 using System;
+using static System.Windows.Forms.AxHost;
 
 namespace StoreRobberyEnhanced.Minigame
 {
@@ -361,6 +362,7 @@ namespace StoreRobberyEnhanced.Minigame
             if (_store != null)
             {
                 _store.SafeCracked = true;
+                _store.RobberyCompleted = true;
 
                 // ⭐ Persist safe cracked state to INI
                 _ctx.SaveStoreState(_store);   // or StoreDataManager.SaveStoreState(_store)

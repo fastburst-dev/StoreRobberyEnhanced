@@ -237,6 +237,7 @@ namespace StoreRobberyEnhanced.Systems
             store.PendingPayout = 0;
             store.CooldownActive = false;
             store.PlayerMaskedAtStart = false;
+            store.RobberyCompleted = false;
 
             // ------------------------------------------------------------
             // ⭐ STEALTH / ALARM / HEAT
@@ -404,25 +405,26 @@ namespace StoreRobberyEnhanced.Systems
                     }
                 }
 
-                // ⭐ If robbery is active, run core robbery logic
-                if (store.IsRobbed)
+                // ⭐ ABANDON LOGIC — only runs when robbery is active AND not completed
+                if (store.IsRobbed && !store.RobberyCompleted)
                 {
                     try
                     {
-
-                        // ------------------------------------------------------------
-                        // ⭐ EARLY ABANDONMENT LOGIC MUST RUN FIRST
-                        // ------------------------------------------------------------
                         float dist = player.Position.DistanceTo(store.StorePos);
 
-                        bool leftArea = dist > store.Radius;                     // leaving store bubble
-                        bool beyondEscape = dist > _ctx.Config.EscapeDistance;   // abandon threshold
+                        bool leftArea = dist > store.Radius;
+                        bool beyondEscape = dist > _ctx.Config.EscapeDistance;
                         bool clerkDead = store.ClerkDeathHandled;
 
-                        // NON-VIOLENT ABANDON (clerk alive)
+                        // ⭐ Only allow abandon BEFORE safe crack / payout
+                        bool canAbandon =
+                            !store.PendingCompletion &&
+                            store.PendingPayout <= 0;
+
+                        // ⭐ NON-VIOLENT ABANDON (clerk alive)
                         if (leftArea && beyondEscape && !clerkDead)
                         {
-                            DebugLogger.Info($"[ABANDON] Player abandoned robbery at store {store.Id} with clerk alive. No cooldown.");
+                            DebugLogger.Info($"[ABANDON] Player abandoned robbery at store {store.Id} with clerk alive.");
 
                             store.IsRobbed = false;
                             store.IsRobberyActive = false;
@@ -432,7 +434,6 @@ namespace StoreRobberyEnhanced.Systems
                             store.CooldownActive = false;
                             store.LastRobbedUtc = DateTime.MinValue;
 
-                            // ⭐ FULL CLERK RESET AFTER ABANDON
                             if (store.Clerk != null && store.Clerk.Exists())
                             {
                                 store.Clerk.Delete();
@@ -453,10 +454,8 @@ namespace StoreRobberyEnhanced.Systems
                             store.ClerkSurrenderStage = 0;
                             store.ClerkPanicking = false;
 
-                            // ⭐ Force replacement system to run again
                             store.DefaultClerkRemoved = false;
 
-                            // ⭐ Clear wanted level
                             Game.Player.WantedLevel = 0;
                             store.WantedSuppressionEndUtc = DateTime.UtcNow.AddSeconds(3);
 
@@ -467,10 +466,10 @@ namespace StoreRobberyEnhanced.Systems
                             return;
                         }
 
-                        // VIOLENT ABANDON (clerk dead)
+                        // ⭐ VIOLENT ABANDON (clerk dead)
                         if (leftArea && beyondEscape && clerkDead)
                         {
-                            DebugLogger.Info($"[ABANDON-VIOLENT] Player killed clerk and fled store {store.Id}. Ending robbery with NO payout and NO cooldown.");
+                            DebugLogger.Info($"[ABANDON-VIOLENT] Player killed clerk and fled store {store.Id}.");
 
                             store.IsRobbed = false;
                             store.IsRobberyActive = false;
@@ -480,7 +479,6 @@ namespace StoreRobberyEnhanced.Systems
                             store.CooldownActive = false;
                             store.LastRobbedUtc = DateTime.MinValue;
 
-                            // ⭐ FULL CLERK RESET AFTER ABANDON
                             if (store.Clerk != null && store.Clerk.Exists())
                             {
                                 store.Clerk.Delete();
@@ -501,10 +499,8 @@ namespace StoreRobberyEnhanced.Systems
                             store.ClerkSurrenderStage = 0;
                             store.ClerkPanicking = false;
 
-                            // ⭐ Force replacement system to run again
                             store.DefaultClerkRemoved = false;
 
-                            // ⭐ Clear wanted level
                             Game.Player.WantedLevel = 0;
                             store.WantedSuppressionEndUtc = DateTime.UtcNow.AddSeconds(3);
 
@@ -517,12 +513,13 @@ namespace StoreRobberyEnhanced.Systems
                     }
                     catch (Exception ex)
                     {
-                        DebugLogger.LogException("RobberySystem.EscapeDistance", ex);
+                        DebugLogger.LogException("RobberySystem.AbandonLogic", ex);
                     }
+                }
 
-                    // ------------------------------------------------------------
-                    // ⭐ ORIGINAL ROBBERY LOGIC (runs only if not abandoned)
-                    // ------------------------------------------------------------
+                // ⭐ ESCAPE + COMPLETION LOGIC — ALWAYS RUNS WHILE ROBBERY IS ACTIVE
+                if (store.IsRobbed)
+                {
                     UpdateRobberyTimer(store);
                     CheckCameraTriggeredAlarm(store);
                     CheckLeavingEarly(store, player);
@@ -599,7 +596,6 @@ namespace StoreRobberyEnhanced.Systems
                     {
                         float safeDistSilent = player.Position.DistanceTo(store.SafePos);
 
-                        // ⭐ ONLY show prompt when close enough
                         if (safeDistSilent <= 1.2f)
                         {
                             if (usingController)
@@ -631,7 +627,6 @@ namespace StoreRobberyEnhanced.Systems
 
                     float safeDist = player.Position.DistanceTo(store.SafePos);
 
-                    // ⭐ ONLY show prompt when close enough
                     if (safeDist <= 1.2f)
                     {
                         if (usingController)
@@ -694,6 +689,14 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 if (store.IsRobbed || store.Clerk == null || !store.Clerk.Exists())
                     return;
+
+                // ------------------------------------------------------------
+                // ⭐ CRITICAL FIX — RESET COMPLETION FLAGS FOR NEW ROBBERY
+                // ------------------------------------------------------------
+                store.RobberyCompleted = false;     // <—— REQUIRED FIX
+                store.RobberyEnded = false;         // <—— ensures timer + logic run
+                store.PendingCompletion = false;    // <—— will be set true below
+                // (PendingPayout is intentionally NOT reset here — silent robbery may add payout immediately)
 
                 // ------------------------------------------------------------
                 // DISTANCE CHECK
@@ -879,6 +882,12 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
+                // ⭐ CRITICAL FIX — RESET COMPLETION FLAGS FOR NEW ROBBERY
+                store.RobberyCompleted = false;     // <—— REQUIRED FIX
+                store.RobberyEnded = false;         // <—— ensures timer + logic run
+                                                    // PendingCompletion will be set below
+                                                    // PendingPayout is intentionally NOT reset here (silent robbery may add payout early)
+
                 store.IsRobbed = true;
                 store.IsRobberyActive = true; // ⭐ keep in sync with clerk/police/camera systems
                 store.RobberyStartUtc = DateTime.UtcNow;
@@ -1287,6 +1296,9 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
+        // ------------------------------------------------------------
+        // FINAL EARLY COMPLETION (FULLY PATCHED & SILENT‑SAFE)
+        // ------------------------------------------------------------
         private void CheckEarlyEscapeSuccess(TrackedStore store, Ped player)
         {
             try
@@ -1297,10 +1309,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 // ⭐ NEVER allow early escape during surrender
                 if (store.ClerkSurrender || store.ClerkSurrenderStage > 0)
-                {
-                    // Prevent premature robbery end
                     return;
-                }
 
                 // ⭐ Debug override
                 if (_debugEscapeActive && store.Id == _debugEscapeStoreId)
@@ -1410,13 +1419,6 @@ namespace StoreRobberyEnhanced.Systems
                 if (!store.PendingCompletion || store.PendingPayout <= 0)
                     return;
 
-                // ⭐ HARD GUARD — never complete while clerk is in surrender flow
-                //if (store.ClerkSurrender || store.ClerkSurrenderStage > 0)
-                //{
-                //    DebugLogger.Info($"[COMPLETE BLOCKED] Store {store.Id} still in surrender state (stage={store.ClerkSurrenderStage}).");
-                //    return;
-                //}
-
                 // ⭐ Loud robberies must lose cops first
                 if (!store.SilentRobbery && Game.Player.WantedLevel > 0)
                 {
@@ -1473,16 +1475,16 @@ namespace StoreRobberyEnhanced.Systems
                     return;
                 }
 
-                DebugLogger.Info($"Robbery completion triggered for store {store.Id} (dist={dist:F1}, escape={_ctx.Config.EscapeDistance:F1})");
+                DebugLogger.Info($"Robbery completion triggered for store {store.Id}");
 
                 // ------------------------------------------------------------
                 // ⭐ CRITICAL FIX — STOP TIMER + STOP ALL ROBBERY LOGIC
                 // ------------------------------------------------------------
-                store.RobberyEnded = true;          // <— MASTER KILL SWITCH
-                store.IsRobbed = false;             // <— prevents timer loop
-                store.IsRobberyActive = false;      // <— prevents all robbery logic
-                store.PendingCompletion = false;    // <— prevents re-entry
-                store.RobberyStartUtc = DateTime.MinValue; // <— timer cannot compute elapsed
+                store.RobberyEnded = true;
+                store.IsRobbed = false;
+                store.IsRobberyActive = false;
+                store.PendingCompletion = false;
+                store.RobberyStartUtc = DateTime.MinValue;
 
                 // ⭐ Clear UI timer immediately
                 _ctx.Ui.ClearTimer();
@@ -1501,7 +1503,6 @@ namespace StoreRobberyEnhanced.Systems
                 DebugLogger.LogException("RobberySystem.CompleteRobbery", ex);
             }
         }
-
 
         // ------------------------------------------------------------
         // PATCH 11 SUPPORT — Finalize payout (collection mode)

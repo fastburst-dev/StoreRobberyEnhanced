@@ -193,7 +193,7 @@ namespace StoreRobberyEnhanced.Systems
                     // ⭐ CLEAN UP BLOOD / BULLET HOLES / DECALS AT CLERK LOCATION
                     Function.Call(Hash.REMOVE_DECALS_IN_RANGE,
                         cleanupPos.X, cleanupPos.Y, cleanupPos.Z,
-                        5.0f); // 5m radius around clerk
+                        5.0f);
                 }
 
                 store.Clerk = null;
@@ -228,7 +228,7 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 Function.Call(Hash.REMOVE_DECALS_IN_RANGE,
                     store.StorePos.X, store.StorePos.Y, store.StorePos.Z,
-                    store.Radius); // full store radius cleanup
+                    store.Radius);
 
                 // ------------------------------------------------------------
                 // ⭐ SPAWN A FRESH CLERK
