@@ -781,7 +781,7 @@ namespace StoreRobberyEnhanced.Systems
                     Task.Run(async () =>
                     {
                         await Task.Delay(2000);
-                        _ctx.Ui.ShowNotification("~r~Silent robbery started.");
+                        _ctx.Ui.ShowNotification("~o~Silent robbery started.");
                     });
 
                     // ------------------------------------------------------------
@@ -798,7 +798,7 @@ namespace StoreRobberyEnhanced.Systems
 
                     Task.Run(async () =>
                     {
-                        await Task.Delay(2000);
+                        await Task.Delay(3500);
                         _ctx.Ui.ShowSubtitle("~o~Silent robbery started, complete & leave quietly.", 4000);
                     });
 

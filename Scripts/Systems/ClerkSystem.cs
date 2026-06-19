@@ -880,6 +880,45 @@ namespace StoreRobberyEnhanced.Systems
                 // Cosmetic-only animation
                 clerk.Task.ClearAllImmediately();
 
+                if (SafeLoadAnimDict("oddjobs@shop_robbery@rob_till"))
+                {
+                    Function.Call(
+                        Hash.TASK_PLAY_ANIM,
+                        clerk.Handle,
+                        "oddjobs@shop_robbery@rob_till",
+                        "enter",
+                        4.0f, -4.0f,
+                        1000,
+                        (int)(AnimationFlags.Loop | AnimationFlags.UpperBodyOnly),
+                        0f,
+                        false, false, false
+                    );
+
+                    if (_ctx.Config.EnableStalkerMsg)
+                        _ctx.Stalker.QueueRobberyMessage();
+                }
+
+                Script.Wait(1000);
+
+                if (SafeLoadAnimDict("oddjobs@shop_robbery@rob_till"))
+                {
+                    // Play the give-money animation
+                    Function.Call(
+                        Hash.TASK_PLAY_ANIM,
+                        clerk.Handle,
+                        "oddjobs@shop_robbery@rob_till",
+                        "loop",
+                        8.0f,
+                        -8.0f,
+                        4000,
+                        1 | 2,
+                        0f,
+                        false, false, false
+                    );
+                }
+
+                Script.Wait(1000);
+
                 Function.Call(Hash.REQUEST_ANIM_DICT, "mp_common");
 
                 if (Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "mp_common"))
@@ -900,6 +939,11 @@ namespace StoreRobberyEnhanced.Systems
 
                 // ⭐ PLAY QUIET REGISTER / MONEY SOUND
                 // "ROBBERY_MONEY" is a subtle cash-handling sound used in GTA V
+                //int timeout = Game.GameTime + 10000;
+                //while (Game.GameTime < timeout)
+                //    Script.Yield();
+
+                Script.Wait(5000);
                 Function.Call(Hash.PLAY_SOUND_FRONTEND, -1, "ROBBERY_MONEY", "HUD_AWARDS");
                 Script.Wait(300); // small delay to avoid sound overlap
 
@@ -909,7 +953,8 @@ namespace StoreRobberyEnhanced.Systems
                 Function.Call(Hash.PLAY_SOUND_FRONTEND, -1, "PICK_UP", "HUD_FRONTEND_DEFAULT_SOUNDSET");
 
                 // ⭐ PLAYER NOTIFICATION
-                _ctx.Ui.ShowNotification("~g~Clerk quietly hands over the register cash.~s~ Crack the safe before leaving.");
+                _ctx.Ui.ShowNotification("~y~Clerk quietly hands over the register cash.~s~ Crack the safe before leaving.");
+                
                 DebugLogger.Info($"Played silent robbery anim for store {store.Id} on clerk {clerk.Handle}");
             }
             catch (Exception ex)
@@ -1103,10 +1148,11 @@ namespace StoreRobberyEnhanced.Systems
                 store.ClerkIdle = false;
 
                 clerk.Task.ClearAllImmediately();
-                clerk.Task.HandsUp(-1);
-
+                
                 //Function.Call(Hash.PLAY_PED_AMBIENT_SPEECH_NATIVE, clerk, "SHOP_CLERK_REACT", "SPEECH_PARAMS_FORCE", 0);
                 SafePlaySpeech(clerk, _speech.Get("Threat"), "SPEECH_PARAMS_FORCE");
+                
+                clerk.Task.HandsUp(-1);
 
                 // Recognition escalation
                 if (store.TimesRobbed >= 2)

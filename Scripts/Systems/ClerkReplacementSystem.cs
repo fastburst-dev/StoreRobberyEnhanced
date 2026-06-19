@@ -223,12 +223,19 @@ namespace StoreRobberyEnhanced.Systems
                     store.DummyClerk = null;
                 }
 
+
                 // ------------------------------------------------------------
                 // ⭐ CLEAN THE ENTIRE STORE INTERIOR (DECALS ONLY)
                 // ------------------------------------------------------------
                 Function.Call(Hash.REMOVE_DECALS_IN_RANGE,
                     store.StorePos.X, store.StorePos.Y, store.StorePos.Z,
                     store.Radius);
+
+                if (store.LootBag != null && store.LootBag.Exists())
+                {
+                    store.LootBag.Delete();
+                    store.LootBag = null;
+                }
 
                 // ------------------------------------------------------------
                 // ⭐ SPAWN A FRESH CLERK

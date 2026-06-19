@@ -431,6 +431,9 @@ namespace StoreRobberyEnhanced
 
                     if (store.CooldownBlocker != null && store.CooldownBlocker.Exists())
                         store.CooldownBlocker.Delete();
+
+                    if (store.LootBag != null && store.LootBag.Exists())
+                        store.LootBag.Delete();
                 }
 
                 // Abort SafeCrack if running
