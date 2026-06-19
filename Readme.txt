@@ -95,7 +95,7 @@ Calls react to your behavior
 Ignoring calls triggers different message sets
 Answering calls unlocks deeper psychological lines
 
-💬 350+ Dynamic Stalker Messages
+💬 450+ Dynamic Stalker Messages
 Organized into categories:
  * Knockout — when you leave clerks alive but unconscious
  * MeleeKill — when you kill up close
@@ -104,7 +104,7 @@ Organized into categories:
  * Escape — when fleeing the scene
  * CallAnswered — when you pick up
  * CallIgnored — when you don’t
-Each category contains 35 unique lines, totaling over 350 lines of reactive dialogue.
+Each category contains 66 unique lines, totaling over 450 lines of reactive dialogue.
 
 🎭 Personality‑Driven Reactions
 The stalker:
@@ -264,7 +264,7 @@ EnableEvents	Enables debug events
 AutoSnapshotOnScenario	Takes snapshot during scenarios
 
 📄 StalkerMessages.ini
-Contains 350+ dynamic stalker lines across categories:
+Contains 450+ dynamic stalker lines across categories:
 
 Knockout
 MeleeKill
@@ -280,6 +280,7 @@ These messages are delivered during robberies, escapes, and phone events to crea
 [Main Settings]
 EnableMessages — toggles all robbery messages
 EnablePolice — toggles police escalation
+EnableBlips — toggles Map Blips system
 CooldownMinutes — store cooldown duration
 RobberyTimeLimit — max robbery time
 EscapeDistance — distance required to escape
@@ -297,6 +298,7 @@ CallerImage — phone caller icon
 CallerName — caller display name
 MaxMessagesPerRobbery — message limit
 MessageCooldownSeconds — cooldown between messages
+MessageType — 1 chat box, 2 Email, 3 Add Friend Request or 0 None Right corner
 
 [Store Settings]
 RegisterMinAmount / MaxAmount — register payout range

@@ -95,7 +95,7 @@ A fully interactive, skill‑based safe cracking system:
 ## 🔪 Stalker System — Psychological Threat Layer
 A dynamic psychological system that reacts to your behavior:
 
-- **350+ reactive stalker messages**  
+- **450+ reactive stalker messages**  
 - Categories include:
   - Knockout  
   - MeleeKill  
@@ -238,6 +238,7 @@ Each category contains 35 unique lines.
 ### **[Main Settings]**
 - EnableMessages  
 - EnablePolice  
+- EnableBlips
 - CooldownMinutes  
 - RobberyTimeLimit  
 - EscapeDistance  
