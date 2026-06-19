@@ -104,6 +104,12 @@ namespace StoreRobberyEnhanced.Data
         public DateTime LastSilentAlarmAttemptUtc { get; set; } = DateTime.MinValue;
 
         // ------------------------------------------------------------
+        // WANTED LEVEL SUPPRESSION (Clerk Kill Override)
+        // ------------------------------------------------------------
+        public DateTime WantedSuppressionEndUtc = DateTime.MinValue;
+        public bool WantedClearOnEscape = false;
+
+        // ------------------------------------------------------------
         // PATCH 11 SUPPORT — Collected payout tracking
         // ------------------------------------------------------------
         public int CollectedPayout { get; set; } = 0;

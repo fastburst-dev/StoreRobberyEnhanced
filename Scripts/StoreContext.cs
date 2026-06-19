@@ -1,17 +1,18 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
-using GTA;
+﻿using GTA;
 using GTA.Math;
+using GTA.Native;
 using LemonUI;
-using StoreRobberyEnhanced.Data;
-using StoreRobberyEnhanced.Systems;
-using StoreRobberyEnhanced.Initialization;
-using StoreRobberyEnhanced.UI;
 using StoreRobberyEnhanced.Config;
+using StoreRobberyEnhanced.Data;
 using StoreRobberyEnhanced.Debug;
+using StoreRobberyEnhanced.Initialization;
 using StoreRobberyEnhanced.Minigame;
 using StoreRobberyEnhanced.Scripts.Systems;
+using StoreRobberyEnhanced.Systems;
+using StoreRobberyEnhanced.UI;
+using System;
+using System.Collections.Generic;
+using System.IO;
 
 namespace StoreRobberyEnhanced
 {
@@ -303,6 +304,34 @@ namespace StoreRobberyEnhanced
                             store.NativeClerkRemovedRecently = false;
                         }
                     }
+                }
+
+                // ------------------------------------------------------------
+                // ⭐ WANTED LEVEL SUPPRESSION WINDOW (Escape / Cleanup)
+                // ------------------------------------------------------------
+                bool anySuppressionActive = false;
+
+                foreach (var store in Stores)
+                {
+                    if (store.WantedSuppressionEndUtc > now)
+                    {
+                        anySuppressionActive = true;
+                        break;
+                    }
+                }
+
+                if (anySuppressionActive)
+                {
+                    // Hard‑force NO wanted while any store is in suppression window
+                    Function.Call(Hash.SET_MAX_WANTED_LEVEL, 0);
+                    Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, true);
+                    Game.Player.WantedLevel = 0;
+                }
+                else
+                {
+                    // Restore normal behavior when no store is in suppression
+                    Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, false);
+                    Function.Call(Hash.SET_MAX_WANTED_LEVEL, 5);
                 }
 
                 // ⭐ Update blips first

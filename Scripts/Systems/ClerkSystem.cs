@@ -2214,7 +2214,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // CLERK DEATH HANDLING LOGIC
+        // CLERK DEATH HANDLING LOGIC (FINAL PATCHED VERSION)
         // ------------------------------------------------------------
         private void HandleClerkDeath(TrackedStore store)
         {
@@ -2233,32 +2233,43 @@ namespace StoreRobberyEnhanced.Systems
                 Ped clerk = store.Clerk;
                 Ped player = Game.Player.Character;
 
-                // If clerk reference is gone, treat as dead
                 bool clerkExists = (clerk != null && clerk.Exists());
                 bool isDead = clerkExists && clerk.IsDead;
                 int health = clerkExists ? clerk.Health : 0;
 
                 DebugLogger.Info($"[DeathCheck] exists={clerkExists}, isDead={isDead}, health={health}");
 
-                // KO / DEATH DETECTION
+                // ⭐ Treat surrendered/frozen clerks as "soft dead"
+                bool stuckSurrender = store.ClerkSurrender || store.ClerkSurrenderStage > 0;
+                bool frozen = clerkExists && (clerk.IsPositionFrozen || clerk.IsRagdoll);
 
-                // 1) NON-LETHAL KNOCKOUT — ONLY IF ALIVE
+                if (stuckSurrender || frozen)
+                {
+                    DebugLogger.Info($"[DeathCheck] Clerk stuck in surrender/frozen state at store {store.Id}, forcing cleanup.");
+                    isDead = true;
+                }
+
+                // ------------------------------------------------------------
+                // ⭐ ALWAYS ACTIVATE ROBBERY STATE WHEN CLERK DIES
+                // ------------------------------------------------------------
+                store.IsRobbed = true;
+                store.IsRobberyActive = true;
+                store.PendingCompletion = true;
+
+                if (store.RobberyStartUtc == DateTime.MinValue)
+                    store.RobberyStartUtc = DateTime.UtcNow;
+
+                // ------------------------------------------------------------
+                // KO / DEATH DETECTION
+                // ------------------------------------------------------------
+                // 1) NON-LETHAL KNOCKOUT
                 if (clerkExists && !isDead && health > 0 && IsPedKnockedOut(clerk))
                 {
                     store.ClerkKilledWithGun = false;
                     store.SilentRobbery = true;
 
-                    // ⭐ ENSURE ROBBERY STATE IS ACTIVE
-                    store.IsRobbed = true;
-                    store.IsRobberyActive = true;
-                    store.PendingCompletion = true;
-                    if (store.RobberyStartUtc == DateTime.MinValue)
-                        store.RobberyStartUtc = DateTime.UtcNow;
-
-                    // Force KO ragdoll
                     KnockOutPed(clerk);
 
-                    // UI + Stalker
                     _ctx.Ui.TextNotification(
                         "DIA_SILENT",
                         "Silent Takedown",
@@ -2280,17 +2291,10 @@ namespace StoreRobberyEnhanced.Systems
 
                     bool melee = _ctx.Player.IsMeleeWeapon(weapon);
 
-                    // 2) LETHAL KILL (GUN) — DEAD OR HANDLE INVALID
+                    // 2) LETHAL KILL (GUN)
                     if (!clerkExists || (isDead && !melee))
                     {
                         store.ClerkKilledWithGun = true;
-
-                        // ⭐ ENSURE ROBBERY STATE IS ACTIVE
-                        store.IsRobbed = true;
-                        store.IsRobberyActive = true;
-                        store.PendingCompletion = true;
-                        if (store.RobberyStartUtc == DateTime.MinValue)
-                            store.RobberyStartUtc = DateTime.UtcNow;
 
                         _ctx.Ui.TextNotification(
                             "DIA_POLICE",
@@ -2300,23 +2304,25 @@ namespace StoreRobberyEnhanced.Systems
                         );
 
                         _ctx.Stalker.QueueGunKillMessage();
-
-                        // Gun kill ALWAYS activates robbery
                         _ctx.SetRobberyActive(true);
 
                         DebugLogger.Info($"[GUN KILL] Clerk {clerk?.Handle} shot and killed at store {store.Id} / {store.Name}");
+
+                        // ------------------------------------------------------------
+                        // ⭐ CUSTOM WANTED LEVEL FOR CLERK KILL (1–2 stars)
+                        // ------------------------------------------------------------
+                        int desiredStars = Math.Max(1, Math.Min(2, 2));
+                        Function.Call(Hash.SET_MAX_WANTED_LEVEL, desiredStars);
+                        Game.Player.WantedLevel = desiredStars;
+
+                        // Prevent Rockstar from re-applying 3 stars for 2 seconds
+                        store.WantedSuppressionEndUtc = DateTime.UtcNow.AddSeconds(2);
+                        Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, true);
                     }
                     // 3) LETHAL KILL (MELEE)
                     else if (isDead && melee)
                     {
                         store.ClerkKilledWithGun = false;
-
-                        // ⭐ ENSURE ROBBERY STATE IS ACTIVE
-                        store.IsRobbed = true;
-                        store.IsRobberyActive = true;
-                        store.PendingCompletion = true;
-                        if (store.RobberyStartUtc == DateTime.MinValue)
-                            store.RobberyStartUtc = DateTime.UtcNow;
 
                         _ctx.Ui.TextNotification(
                             "DIA_POLICE",
@@ -2326,16 +2332,29 @@ namespace StoreRobberyEnhanced.Systems
                         );
 
                         _ctx.Stalker.QueueMeleeKillMessage();
-
-                        // ⭐ Ensure global robbery flag is active for StalkerSystem
                         _ctx.SetRobberyActive(true);
 
                         DebugLogger.Info($"[MELEE KILL] Clerk {clerk.Handle} killed via melee at store {store.Id} / {store.Name}");
+
+                        // ------------------------------------------------------------
+                        // ⭐ CUSTOM WANTED LEVEL FOR CLERK KILL (1–2 stars)
+                        // ------------------------------------------------------------
+                        int desiredStars = Math.Max(1, Math.Min(2, 1));
+                        Function.Call(Hash.SET_MAX_WANTED_LEVEL, desiredStars);
+                        Game.Player.WantedLevel = desiredStars;
+
+                        // Prevent Rockstar from re-applying 3 stars for 2 seconds
+                        store.WantedSuppressionEndUtc = DateTime.UtcNow.AddSeconds(2);
+                        Function.Call(Hash.SET_POLICE_IGNORE_PLAYER, Game.Player, true);
                     }
                 }
 
-                // NEW SYSTEM CLEANUP
-                store.Clerk = null;
+                // ------------------------------------------------------------
+                // ⭐ DO NOT DELETE THE CLERK HERE
+                // Cleanup happens in ClerkReplacementSystem AFTER robbery ends
+                // ------------------------------------------------------------
+
+                // Reset clerk state flags
                 store.IsOurClerk = false;
                 store.ClerkIdle = false;
                 store.ClerkReacted = false;
@@ -2345,13 +2364,8 @@ namespace StoreRobberyEnhanced.Systems
                 store.ClerkThrowingBag = false;
                 store.ClerkPanicking = false;
                 store.ClerkFleeing = false;
-
-                // Dummy clerk safety
-                if (store.DummyClerk != null && store.DummyClerk.Exists())
-                {
-                    store.DummyClerk.Delete();
-                    store.DummyClerk = null;
-                }
+                store.ClerkSurrender = false;
+                store.ClerkSurrenderStage = 0;
 
                 store.ClerkDeathHandledCheck = true;
             }

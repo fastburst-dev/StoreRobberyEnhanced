@@ -87,11 +87,16 @@ namespace StoreRobberyEnhanced.Systems
                 Game.Player.WantedLevel = 0;
                 _ctx.Police.SuppressPoliceForDebug = true;
 
-                // If clerk exists BUT is in a broken state (surrender, cower, panic), reset him
+                // If clerk exists BUT is in a broken state (surrender, cower, panic, frozen), reset him
                 if (store.Clerk != null && store.Clerk.Exists())
                 {
-                    if (store.ClerkPanicking || store.ClerkSurrenderStage > 0)
+                    bool stuckSurrender = store.ClerkSurrender || store.ClerkSurrenderStage > 0;
+                    bool frozen = store.Clerk.IsPositionFrozen || store.Clerk.IsRagdoll;
+                    bool panicking = store.ClerkPanicking;
+
+                    if (stuckSurrender || frozen || panicking)
                     {
+                        DebugLogger.Info($"[RESET] Removing surrendered/frozen clerk for store {store.Id}");
                         ResetClerk(store);
                         return;
                     }
@@ -173,10 +178,10 @@ namespace StoreRobberyEnhanced.Systems
             {
                 Ped clerk = store.Clerk;
 
-                // Delete old clerk
+                // Delete old clerk safely
                 if (clerk != null && clerk.Exists())
                 {
-                    clerk.Task.ClearAllImmediately();
+                    Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, clerk);
                     clerk.MarkAsNoLongerNeeded();
                     clerk.Delete();
                 }
@@ -192,18 +197,27 @@ namespace StoreRobberyEnhanced.Systems
                 store.ClerkGrabbingCash = false;
                 store.ClerkThrowingBag = false;
                 store.ClerkStalling = false;
+                store.ClerkSurrender = false;
 
                 store.ClerkAnimDurationMs = 0;
                 store.ClerkAnimStartUtc = DateTime.UtcNow;
 
+                // Delete dummy clerk if still present
+                if (store.DummyClerk != null && store.DummyClerk.Exists())
+                {
+                    store.DummyClerk.Delete();
+                    store.DummyClerk = null;
+                }
+
                 // Spawn a fresh clerk
                 _ctx.Clerks.ForceSpawnClerk(store);
+
+                // DebugLogger.Info($"[RESET] Clerk respawned cleanly for store {store.Id}");
             }
             catch (Exception ex)
             {
                 DebugLogger.LogException("ClerkReplacementSystem.ResetClerk", ex);
             }
         }
-
     }
 }

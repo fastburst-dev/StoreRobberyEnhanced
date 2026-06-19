@@ -362,12 +362,12 @@ namespace StoreRobberyEnhanced.Systems
                 store.IsRobberyActive = false;
                 _ctx.SetRobberyActive(false);
 
+                // ⭐ DO NOT DELETE THE CLERK HERE
+                // Let ClerkReplacementSystem handle cleanup safely.
                 if (store.Clerk != null && store.Clerk.Exists())
                 {
-                    Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, store.Clerk);
-                    store.Clerk.MarkAsNoLongerNeeded();
-                    store.Clerk.Delete();
-                    store.Clerk = null;
+                    DebugLogger.Info($"[ResetStore] Marking clerk for delayed cleanup at store {store.Id}");
+                    // Leave the ped in the world — replacement system will delete it.
                 }
 
                 RemoveCooldownBlocker(store);
