@@ -31,28 +31,51 @@ namespace StoreRobberyEnhanced.Debug
 
             try
             {
+                // ⭐ Ensure clerk exists before starting robbery
+                var store = _ctx.GetNearestStore();
+                if (store == null)
+                {
+                    _ui.ShowNotification("~r~No store found for scenario.");
+                    _runningScenario = false;
+                    return;
+                }
+
+                int attempts = 0;
+                while ((store.Clerk == null || !store.Clerk.Exists()) && attempts < 60)
+                {
+                    await Delay(100);
+                    attempts++;
+                }
+
+                if (store.Clerk == null || !store.Clerk.Exists())
+                {
+                    _ui.ShowNotification("~r~Clerk failed to spawn. Scenario aborted.");
+                    _runningScenario = false;
+                    return;
+                }
+
                 DebugLogger.Info("Scenario: RobberyStart");
-                _ctx.Robberies.TryStartDebugRobbery(out _);
+                DebugActions.TriggerRobberyStart();
                 await Delay(1500);
 
                 DebugLogger.Info("Scenario: CameraAlarm");
-                _ctx.Cameras.DebugTriggerAlarm();
+                DebugActions.TriggerCameraAlarm();
                 await Delay(1500);
 
                 DebugLogger.Info("Scenario: SafeCrack");
-                _ctx.Safes.DebugForceSafeCrack(out _);
+                DebugActions.TriggerSafeCrack();
                 await Delay(2000);
 
                 DebugLogger.Info("Scenario: Escape");
-                _ctx.Robberies.DebugForceEscape();
+                DebugActions.TriggerEscape();
                 await Delay(1500);
 
                 DebugLogger.Info("Scenario: Payout");
-                _ctx.Robberies.DebugForcePayout();
+                DebugActions.TriggerPayout();
                 await Delay(1500);
 
                 DebugLogger.Info("Scenario: Cooldown");
-                _ctx.Cooldowns.DebugForceCooldown();
+                DebugActions.TriggerCooldown();
 
                 _ui.ShowNotification("~g~Full Robbery Scenario Complete");
             }
@@ -65,6 +88,7 @@ namespace StoreRobberyEnhanced.Debug
                 _runningScenario = false;
             }
         }
+
 
         internal async void RunQuickLootScenario()
         {
@@ -100,9 +124,14 @@ namespace StoreRobberyEnhanced.Debug
             }
         }
 
-        private static Task Delay(int ms)
+        private static async Task Delay(int ms)
         {
-            return Task.Run(() => Script.Wait(ms));
+            int end = Game.GameTime + ms;
+            while (Game.GameTime < end)
+            {
+                await Task.Yield();   // returns control to SHVDN main loop
+            }
         }
+
     }
 }

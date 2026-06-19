@@ -4,6 +4,7 @@ using GTA.Native;
 using StoreRobberyEnhanced.Data;
 using StoreRobberyEnhanced.Debug;
 using System;
+using System.Collections.Generic;
 
 namespace StoreRobberyEnhanced.UI
 {
@@ -250,7 +251,7 @@ namespace StoreRobberyEnhanced.UI
                     return false;
 
                 Weapon weapon = player.Weapons.Current;
-                bool result = weapon != null && weapon.Hash != WeaponHash.Unarmed;
+                bool result = weapon != null && !_notWeapons.Contains(weapon.Hash);
 
                 DebugLogger.Trace($"IsArmed() = {result}");
                 return result;
@@ -311,7 +312,14 @@ namespace StoreRobberyEnhanced.UI
                     hash == WeaponHash.Flashlight ||
                     hash == WeaponHash.SwitchBlade ||
                     hash == WeaponHash.PoolCue ||
-                    hash == WeaponHash.Wrench;
+                    hash == WeaponHash.Wrench ||
+                    hash == WeaponHash.BattleAxe ||
+                    hash == WeaponHash.PoolCue ||
+                    hash == WeaponHash.StoneHatchet ||
+                    hash == WeaponHash.CandyCane ||
+                    hash == WeaponHash.Snowball ||
+                    hash == WeaponHash.Ball;
+            
 
                 DebugLogger.Trace($"IsMeleeWeapon({hash}) = {result}");
                 return result;
@@ -322,6 +330,43 @@ namespace StoreRobberyEnhanced.UI
                 return false;
             }
         }
+
+        public static readonly HashSet<WeaponHash> _notWeapons = new HashSet<WeaponHash>()
+        {
+            {WeaponHash.Dagger},  // you can remove this if you consider it a weapon
+            {WeaponHash.Bat},
+            {WeaponHash.Bottle},  // you can remove this if you consider it a weapon
+            {WeaponHash.Crowbar},
+            {WeaponHash.Unarmed},
+            {WeaponHash.Flashlight},
+            {WeaponHash.GolfClub},
+            {WeaponHash.Hammer},
+            {WeaponHash.Hatchet},
+            {WeaponHash.KnuckleDuster},  // you can remove this if you consider it a weapon
+            {WeaponHash.Knife},  // you can remove this if you consider it a weapon
+            {WeaponHash.Machete},  // you can remove this if you consider it a weapon
+            {WeaponHash.SwitchBlade},  // you can remove this if you consider it a weapon
+            {WeaponHash.Nightstick},  // you can remove this if you consider it a weapon
+            {WeaponHash.Wrench},
+            {WeaponHash.BattleAxe},
+            {WeaponHash.PoolCue},
+            {WeaponHash.StoneHatchet},
+            {WeaponHash.CandyCane},
+            {WeaponHash.StunGunMultiplayer},  // you can remove this if you consider it a weapon
+            {WeaponHash.StunGun},  // you can remove this if you consider it a weapon
+            {WeaponHash.Flare},
+            {WeaponHash.UpNAtomizer},  // you can remove this if you consider it a weapon
+            {WeaponHash.Firework},
+            {WeaponHash.Snowball},
+            {WeaponHash.Ball},
+            {WeaponHash.AcidPackage},
+            {WeaponHash.PetrolCan},
+            {WeaponHash.Parachute},
+            {WeaponHash.FireExtinguisher},
+            {WeaponHash.HazardousJerryCan},
+            {WeaponHash.FertilizerCan},
+            {WeaponHash.FlareGun},
+        };
 
         // ------------------------------------------------------------
         // POSITIONAL CHECKS

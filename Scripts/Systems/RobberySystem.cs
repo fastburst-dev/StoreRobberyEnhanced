@@ -530,8 +530,9 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
-                // Prevent double-starting a robbery
-                if (store.IsRobberyActive)
+                // Prevent double-starting ONLY if clerk has not reacted yet
+                // (ClerkSystem sets IsRobberyActive early, so we must allow start)
+                if (store.IsRobberyActive && !store.ClerkReacted)
                     return;
 
                 // ------------------------------------------------------------
@@ -564,8 +565,9 @@ namespace StoreRobberyEnhanced.Systems
 
                 bool closeEnough = dist < 3.0f;
 
-                bool noAim = !Game.IsControlPressed(Control.Aim) &&
-                             !Game.IsControlPressed(Control.VehicleAim);
+                bool isPhysicallyAiming = _ctx.Player.IsAiming();
+
+                bool noAim = !isPhysicallyAiming;
 
                 bool noAlarm = !store.AlarmTriggered;
 
@@ -660,10 +662,7 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 // ⭐ FIXED AIM CHECK (LOUD ROBBERY)
                 // ------------------------------------------------------------
-                bool isPhysicallyAiming =
-                    Game.IsControlPressed(Control.Aim) ||
-                    Game.IsControlPressed(Control.VehicleAim);
-
+                // Use full aiming detection (controller, mouse, soft aim, LOS)                
                 if (!isPhysicallyAiming)
                     return;
 
@@ -787,6 +786,16 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ HARD STOP — ROBBERY ENDED
                 // ------------------------------------------------------------
                 if (store.RobberyEnded)
+                {
+                    StoreContext.GlobalUi.ClearTimer();
+                    return;
+                }
+
+                // ------------------------------------------------------------
+                // ⭐ SAFETY FIX — INVALID START TIME GUARD
+                // Prevents instant-expire timer if RobberyStartUtc was never set
+                // ------------------------------------------------------------
+                if (store.RobberyStartUtc == DateTime.MinValue)
                 {
                     StoreContext.GlobalUi.ClearTimer();
                     return;
@@ -1123,9 +1132,6 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
-        // ------------------------------------------------------------
-        // EARLY ESCAPE (FULLY PATCHED)
-        // ------------------------------------------------------------
         private void CheckEarlyEscapeSuccess(TrackedStore store, Ped player)
         {
             try
@@ -1133,6 +1139,13 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ Never run early escape during SafeCrack
                 if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
                     return;
+
+                // ⭐ NEVER allow early escape during surrender
+                if (store.ClerkSurrender || store.ClerkSurrenderStage > 0)
+                {
+                    // Prevent premature robbery end
+                    return;
+                }
 
                 // ⭐ Debug override
                 if (_debugEscapeActive && store.Id == _debugEscapeStoreId)
@@ -1150,6 +1163,7 @@ namespace StoreRobberyEnhanced.Systems
                     }
 
                     DebugLogger.Info($"Debug escape success at store {store.Id}");
+
                     // ⭐ FULL STATE RESET
                     store.RobberyEnded = true;
                     store.IsRobbed = false;
@@ -1227,6 +1241,9 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
+                if (store == null || player == null || !player.Exists())
+                    return;
+
                 // ⭐ If store has a safe, require it to be cracked
                 if (store.SafePos != Vector3.Zero && !store.SafeCracked)
                 {
@@ -1237,6 +1254,13 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ Must have pending completion + payout
                 if (!store.PendingCompletion || store.PendingPayout <= 0)
                     return;
+
+                // ⭐ HARD GUARD — never complete while clerk is in surrender flow
+                //if (store.ClerkSurrender || store.ClerkSurrenderStage > 0)
+                //{
+                //    DebugLogger.Info($"[COMPLETE BLOCKED] Store {store.Id} still in surrender state (stage={store.ClerkSurrenderStage}).");
+                //    return;
+                //}
 
                 // ⭐ Loud robberies must lose cops first
                 if (!store.SilentRobbery && Game.Player.WantedLevel > 0)
@@ -1254,44 +1278,47 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     float distdebug = player.Position.DistanceTo(store.StorePos);
 
-                    if (distdebug < _ctx.Config.EscapeDistance)
+                    if (distdebug > _ctx.Config.EscapeDistance)
                     {
-                        _ctx.Ui.ShowSubtitle("Robbery complete! Escape the area.", 3000);
+                        _ctx.Ui.ShowSubtitle("Robbery complete! You escaped the area.", 3000);
                         if (_ctx.Config.EnableStalkerMsg)
                             _ctx.Stalker.QueueEscapeMessage();
 
                         _ctx.Stalker.TryTriggerCall();
+
+                        DebugLogger.Info($"Robbery completion (debug escape) for store {store.Id}");
+
+                        // ⭐ FULL STATE RESET
+                        store.RobberyEnded = true;
+                        store.IsRobbed = false;
+                        store.IsRobberyActive = false;
+                        store.PendingCompletion = false;
+                        store.RobberyStartUtc = DateTime.MinValue;
+
+                        _ctx.Ui.ClearTimer();
+                        _ctx.SetRobberyActive(false);
+
+                        AwardPayout(store);
+                        BeginCooldown(store);
                         return;
                     }
 
-                    DebugLogger.Info($"Robbery completion (debug escape) for store {store.Id}");
-
-                    // ⭐ FULL STATE RESET
-                    store.RobberyEnded = true;
-                    store.IsRobbed = false;
-                    store.IsRobberyActive = false;
-                    store.PendingCompletion = false;
-                    store.RobberyStartUtc = DateTime.MinValue;
-
-                    _ctx.Ui.ClearTimer();
-
-                    _ctx.SetRobberyActive(false);
-
-                    AwardPayout(store);
-                    BeginCooldown(store);
+                    // Still inside radius → just tell player to leave
+                    _ctx.Ui.ShowSubtitle("Escape the area to finish the debug robbery.", 3000);
                     return;
                 }
 
                 float dist = player.Position.DistanceTo(store.StorePos);
 
-                // ⭐ Must escape radius
-                if (dist < _ctx.Config.EscapeDistance)
+                // ⭐ Must actually escape radius to complete
+                if (dist <= _ctx.Config.EscapeDistance)
                 {
+                    // Still inside → robbery is STILL ACTIVE, do NOT reset anything
                     _ctx.Ui.ShowSubtitle("Robbery complete! Escape the area.", 3000);
                     return;
                 }
 
-                DebugLogger.Info($"Robbery completion triggered for store {store.Id}");
+                DebugLogger.Info($"Robbery completion triggered for store {store.Id} (dist={dist:F1}, escape={_ctx.Config.EscapeDistance:F1})");
 
                 // ------------------------------------------------------------
                 // ⭐ CRITICAL FIX — STOP TIMER + STOP ALL ROBBERY LOGIC
@@ -1313,13 +1340,13 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 AwardPayout(store);
                 BeginCooldown(store);
-
             }
             catch (Exception ex)
             {
                 DebugLogger.LogException("RobberySystem.CompleteRobbery", ex);
             }
         }
+
 
         // ------------------------------------------------------------
         // PATCH 11 SUPPORT — Finalize payout (collection mode)

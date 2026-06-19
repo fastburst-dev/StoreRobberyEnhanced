@@ -8,6 +8,7 @@ using StoreRobberyEnhanced.UI;
 using System;
 using System.IO;
 using System.Security.Cryptography;
+using System.Threading.Tasks;
 
 namespace StoreRobberyEnhanced.Systems
 {
@@ -109,6 +110,12 @@ namespace StoreRobberyEnhanced.Systems
                     store.ClerkGrabbingCash = false;
                     store.ClerkThrowingBag = false;
                     store.ClerkPanicking = false;
+
+                    // ⭐ FIX — SafeCrack cancels surrender logic
+                    store.ClerkSurrender = false;
+                    store.ClerkSurrenderStage = 0;
+
+                    return;
                 }
 
                 // If SilentRobbery → clerk must never react
@@ -160,12 +167,17 @@ namespace StoreRobberyEnhanced.Systems
                     store.ClerkSurrenderStage = 0;
                 }
 
-                // If clerk has surrendered → robbery must end
-                if (store.ClerkSurrenderStage == 3 && store.IsRobberyActive)
+                // Clerk fully surrendered — but robbery MUST continue (safe cracking still allowed)
+                if (store.ClerkSurrenderStage == 3)
                 {
-                    // DebugLogger.Info($"[PATCH11] Clerk surrendered — ending robbery for store {store.Id}");
+                    // Play idle surrender animation, but DO NOT end robbery
                     RunIdleSurrenderBehavior(store, clerk);
-                    return;
+
+                    // Keep robbery active
+                    store.IsRobberyActive = true;
+                    store.IsRobbed = true;
+
+                    // DO NOT return — allow robbery system to continue
                 }
 
                 // If robbery ended → no further escalation allowed
@@ -203,7 +215,22 @@ namespace StoreRobberyEnhanced.Systems
                     store.ClerkFleeing = false;
                     store.ClerkSurrenderStage = 0;
                     return;
+                }// If SafeCrack running → freeze clerk
+                if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
+                {
+                    store.ClerkStalling = false;
+                    store.ClerkOpeningRegister = false;
+                    store.ClerkGrabbingCash = false;
+                    store.ClerkThrowingBag = false;
+                    store.ClerkPanicking = false;
+
+                    // ⭐ FIX — SafeCrack cancels surrender logic
+                    store.ClerkSurrender = false;
+                    store.ClerkSurrenderStage = 0;
+
+                    return;
                 }
+
 
                 // ⭐ SAFETY RESET: only if clerk is actually stuck AND no robbery is active
                 bool usingScenario = Function.Call<bool>(Hash.IS_PED_USING_ANY_SCENARIO, clerk);
@@ -1063,6 +1090,11 @@ namespace StoreRobberyEnhanced.Systems
                 if (store == null || clerk == null || !clerk.Exists())
                     return;
 
+                // ⭐ FULL ROBBERY START FLAGS (missing before)
+                store.IsRobbed = true;
+                store.IsRobberyActive = true;
+                store.PendingCompletion = true;
+
                 store.ClerkReacted = true;
                 store.ClerkIdle = false;
                 store.IsRobberyActive = true;
@@ -1382,6 +1414,13 @@ namespace StoreRobberyEnhanced.Systems
                 // Safety: only clear tasks if clerk is stable
                 if (!clerk.IsRagdoll && !store.ClerkFleeing)
                     clerk.Task.ClearAllImmediately();
+
+                SafePlaySpeech(clerk, _speech.Get("CashGrab"), "SPEECH_PARAMS_FORCE");
+
+                Task.Run(async () =>
+                {
+                    await Task.Delay(2000);
+                });
 
                 // LOAD ANIM DICT
                 Function.Call(Hash.REQUEST_ANIM_DICT, "oddjobs@shop_robbery@rob_till");
@@ -2166,12 +2205,19 @@ namespace StoreRobberyEnhanced.Systems
                 DebugLogger.Info($"[DeathCheck] exists={clerkExists}, isDead={isDead}, health={health}");
 
                 // KO / DEATH DETECTION
-                
+
                 // 1) NON-LETHAL KNOCKOUT — ONLY IF ALIVE
                 if (clerkExists && !isDead && health > 0 && IsPedKnockedOut(clerk))
                 {
                     store.ClerkKilledWithGun = false;
                     store.SilentRobbery = true;
+
+                    // ⭐ ENSURE ROBBERY STATE IS ACTIVE
+                    store.IsRobbed = true;
+                    store.IsRobberyActive = true;
+                    store.PendingCompletion = true;
+                    if (store.RobberyStartUtc == DateTime.MinValue)
+                        store.RobberyStartUtc = DateTime.UtcNow;
 
                     // Force KO ragdoll
                     KnockOutPed(clerk);
@@ -2185,7 +2231,6 @@ namespace StoreRobberyEnhanced.Systems
                     );
 
                     _ctx.Stalker.QueueKnockoutMessage();
-
                     _ctx.SetRobberyActive(true);
 
                     DebugLogger.Info($"[KO] Clerk {clerk.Handle} knocked out at store {store.Id} / {store.Name}");
@@ -2204,6 +2249,13 @@ namespace StoreRobberyEnhanced.Systems
                     {
                         store.ClerkKilledWithGun = true;
 
+                        // ⭐ ENSURE ROBBERY STATE IS ACTIVE
+                        store.IsRobbed = true;
+                        store.IsRobberyActive = true;
+                        store.PendingCompletion = true;
+                        if (store.RobberyStartUtc == DateTime.MinValue)
+                            store.RobberyStartUtc = DateTime.UtcNow;
+
                         _ctx.Ui.TextNotification(
                             "DIA_POLICE",
                             "All Units Responding",
@@ -2214,9 +2266,6 @@ namespace StoreRobberyEnhanced.Systems
                         _ctx.Stalker.QueueGunKillMessage();
 
                         // Gun kill ALWAYS activates robbery
-                        store.IsRobberyActive = true;
-
-                        // ⭐ Ensure global robbery flag is active for StalkerSystem
                         _ctx.SetRobberyActive(true);
 
                         DebugLogger.Info($"[GUN KILL] Clerk {clerk?.Handle} shot and killed at store {store.Id} / {store.Name}");
@@ -2225,6 +2274,13 @@ namespace StoreRobberyEnhanced.Systems
                     else if (isDead && melee)
                     {
                         store.ClerkKilledWithGun = false;
+
+                        // ⭐ ENSURE ROBBERY STATE IS ACTIVE
+                        store.IsRobbed = true;
+                        store.IsRobberyActive = true;
+                        store.PendingCompletion = true;
+                        if (store.RobberyStartUtc == DateTime.MinValue)
+                            store.RobberyStartUtc = DateTime.UtcNow;
 
                         _ctx.Ui.TextNotification(
                             "DIA_POLICE",
