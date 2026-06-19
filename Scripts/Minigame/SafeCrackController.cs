@@ -242,7 +242,7 @@ namespace StoreRobberyEnhanced.Minigame
 
             if (now - _state.LastTimerUpdate > 1000)
             {
-                StoreContext.GlobalUi.SetTimerText($"Safe time left: {remaining}", remaining);
+                StoreContext.GlobalUi.SetTimerText($" Safe time left: {remaining}", remaining);
                 _state.LastTimerUpdate = now;
             }
 

@@ -1091,17 +1091,12 @@ namespace StoreRobberyEnhanced.Systems
                     return;
 
                 // ⭐ FULL ROBBERY START FLAGS (missing before)
-                store.IsRobbed = true;
+                //store.IsRobbed = true;
                 store.IsRobberyActive = true;
                 store.PendingCompletion = true;
 
                 store.ClerkReacted = true;
                 store.ClerkIdle = false;
-                store.IsRobberyActive = true;
-
-                // ⭐ ADD THESE TWO LINES
-                store.RobberyStartUtc = DateTime.UtcNow;
-                _ctx.Stalker.ResetForNewRobbery();
 
                 clerk.Task.ClearAllImmediately();
                 clerk.Task.HandsUp(-1);
@@ -1330,6 +1325,10 @@ namespace StoreRobberyEnhanced.Systems
                         SafePlaySpeech(clerk, _speech.Get("Register"), "SPEECH_PARAMS_FORCE");
 
                         _ctx.Ui.ShowNotification("~y~The clerk is opening the register...~s~ Get ready to grab the cash!");
+
+                        if (_ctx.Config.EnableStalkerMsg)
+                            _ctx.Stalker.QueueRobberyMessage();
+
                         DebugLogger.Info($"[ANIM] Clerk at store {store.Id} is opening the register.");
                     }
                     else
@@ -1540,6 +1539,12 @@ namespace StoreRobberyEnhanced.Systems
                     SafePlaySpeech(clerk, _speech.Get("BagToss"), "SPEECH_PARAMS_FORCE");
 
                     _ctx.Ui.ShowNotification("~y~The clerk is tossing the bag...~s~ Grab it, crack the safe and get out of there!");
+
+                    _ctx.Ui.ShowSubtitle("~o~Remember there is a safe in the office — crack it too.", 5000);
+
+                    if (_ctx.Config.EnableStalkerMsg)
+                        _ctx.Stalker.QueueRobberyMessage();
+
                     DebugLogger.Info($"[ANIM] Clerk at store {store.Id} is tossing the bag.");
                 }
                 else
@@ -1976,12 +1981,27 @@ namespace StoreRobberyEnhanced.Systems
                 if (!store.ClerkReacted)
                     return;
 
-                // ⭐ NEW — Block alarm during surrender
+                // Block during surrender
                 if (store.ClerkSurrender || store.ClerkSurrenderStage > 0)
                     return;
 
-                // Chance-based trigger
-                int chance = store.ClerkRecognizedPlayer ? 10 : 5;
+                // ⭐ NEW — Block if clerk is busy with ANY animation
+                if (IsClerkBusy(clerk))
+                    return;
+
+                // ⭐ NEW — Block if player is aiming at clerk
+                if (_ctx.Player.IsAiming())
+                    return;
+
+                // ⭐ NEW — Cooldown between alarm attempts
+                if (store.LastSilentAlarmAttemptUtc > DateTime.UtcNow)
+                    return;
+
+                // Set next attempt window (8 seconds)
+                store.LastSilentAlarmAttemptUtc = DateTime.UtcNow.AddSeconds(8);
+
+                // ⭐ NEW — Lower chance dramatically (1–3%)
+                int chance = store.ClerkRecognizedPlayer ? 3 : 1;
                 if (_rng.Next(0, 100) >= chance)
                     return;
 
@@ -2061,7 +2081,6 @@ namespace StoreRobberyEnhanced.Systems
                 if (store == null || clerk == null || !clerk.Exists() || player == null || !player.Exists())
                     return;
 
-                // ⭐ PATCH 8B — HEAT SAFETY GUARDS
                 if (_ctx.Police.SuppressPoliceForDebug)
                     return;
 
@@ -2077,6 +2096,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
                     return;
 
+                // Block during active clerk phases
                 if (store.ClerkStalling || store.ClerkOpeningRegister || store.ClerkGrabbingCash || store.ClerkThrowingBag)
                     return;
 
@@ -2098,30 +2118,32 @@ namespace StoreRobberyEnhanced.Systems
                 if (!store.IsRobberyActive)
                     return;
 
-                // If player leaves the store radius, clerk may call police
+                // ⭐ Only call police if player LEFT the store
                 if (!store.IsPlayerInsideStore)
                 {
+                    // ⭐ NEW — Cooldown between police call attempts
                     if (DateTime.UtcNow < _nextPoliceCallAttempt)
                         return;
 
+                    _nextPoliceCallAttempt = DateTime.UtcNow.AddSeconds(10); // 10s cooldown
                     store.GreetedPlayer = false;
 
-                    _nextPoliceCallAttempt = DateTime.UtcNow.AddSeconds(5); // 5s cooldown
+                    // ⭐ NEW — Lower chance dramatically (1–5%)
+                    int chance = store.ClerkRecognizedPlayer ? 5 : 2;
+                    if (_rng.Next(0, 100) >= chance)
+                        return;
 
-                    int chance = store.ClerkRecognizedPlayer ? 20 : 5;
-                    if (_rng.Next(0, 100) < chance)
-                    {
-                        store.ClerkCallingPolice = true;
-                        store.ClerkCallStartUtc = DateTime.UtcNow;
+                    store.ClerkCallingPolice = true;
+                    store.ClerkCallStartUtc = DateTime.UtcNow;
 
-                        SafePlaySpeech(clerk, _speech.Get("SilentAlarm"), "SPEECH_PARAMS_FORCE");
+                    SafePlaySpeech(clerk, _speech.Get("SilentAlarm"), "SPEECH_PARAMS_FORCE");
 
-                        //// ⭐ PATCH 8B — SAFE HEAT INCREMENT
-                        //store.HeatLevel += 1;
-                        //Game.Player.WantedLevel = Math.Max(Game.Player.WantedLevel, 2);
+                    //// ⭐ PATCH 8B — SAFE HEAT INCREMENT
+                    //store.HeatLevel += 1;
+                    //Game.Player.WantedLevel = Math.Max(Game.Player.WantedLevel, 2);
 
-                        DebugLogger.Info($"Police called for robbery at store {store.Id}");
-                    }
+                    DebugLogger.Info($"Police called for robbery at store {store.Id}");
+                    
                 }
             }
             catch (Exception ex)

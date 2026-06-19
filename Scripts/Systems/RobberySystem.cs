@@ -553,6 +553,13 @@ namespace StoreRobberyEnhanced.Systems
         {
             try
             {
+                // ⭐ SAFETY: If SafeCrack exists but isn't actually running, make sure it can't block loud robbery
+                if (_ctx.SafeCrack != null && !_ctx.SafeCrack.IsRunning)
+                {
+                    // Hard reset of any stale state that might falsely report "running"
+                    _ctx.SafeCrack.ResetState();
+                }
+
                 // Prevent double-starting ONLY if clerk has not reacted yet
                 // (ClerkSystem sets IsRobberyActive early, so we must allow start)
                 if (store.IsRobberyActive && !store.ClerkReacted)
@@ -703,11 +710,15 @@ namespace StoreRobberyEnhanced.Systems
                 DebugLogger.Info($"Robbery started at store {store.Id}");
 
                 // ------------------------------------------------------------
-                // ⭐ SAFECRACK STEALTH SUPPRESSION
+                // ⭐ SAFECRACK STEALTH SUPPRESSION (PATCHED)
+                // Only suppress loud robbery if SafeCrack is actually running AND player is at the safe
                 // ------------------------------------------------------------
-                if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
+                if (_ctx.SafeCrack != null &&
+                    _ctx.SafeCrack.IsRunning &&
+                    store.SafePos != Vector3.Zero &&
+                    player.Position.DistanceTo(store.SafePos) < 2.0f)
                 {
-                    DebugLogger.Trace($"[RobberySystem] Suppressed — SafeCrack active for store {store.Id}");
+                    DebugLogger.Trace($"[RobberySystem] Suppressed — SafeCrack active near safe for store {store.Id}");
 
                     store.SilentRobbery = true;
                     store.AlarmTriggered = false;
@@ -727,7 +738,10 @@ namespace StoreRobberyEnhanced.Systems
                 _ctx.SetRobberyActive(true);
 
                 if (_ctx.Config.EnableMessages)
-                    _ctx.Ui.ShowNotification("~y~Robbery started!");
+                    _ctx.Ui.ShowNotification("~o~Robbery started!");
+
+                // Subtitle #1
+                _ctx.Ui.ShowSubtitle("Rob the store and escape.", 3000);
 
                 if (_ctx.Config.EnableStalkerMsg)
                     _ctx.Stalker.QueueRobberyMessage();
@@ -777,6 +791,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (store.SafePos != Vector3.Zero)
                 {
                     store.NextSafeSubtitleUtc = DateTime.UtcNow.AddMilliseconds(3200);
+                    _ctx.Ui.ShowSubtitle("There is a safe in the office — crack it too.", 4000);
                 }
 
                 // Save state + update blip
@@ -895,7 +910,7 @@ namespace StoreRobberyEnhanced.Systems
                     int mm = remaining / 60;
                     int ss = remaining % 60;
 
-                    StoreContext.GlobalUi.SetTimerText($"Police in: {mm:00}:{ss:00}", remaining);
+                    StoreContext.GlobalUi.SetTimerText($" Police in: {mm:00}:{ss:00}", remaining);
                     _lastTimerUpdate = Game.GameTime;
                 }
             }

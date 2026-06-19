@@ -101,6 +101,8 @@ namespace StoreRobberyEnhanced.Data
         public int PendingPayout;
         public DateTime RobberyStartUtc = DateTime.MinValue;
         public bool RobberyEnded = false;
+        public DateTime LastSilentAlarmAttemptUtc { get; set; } = DateTime.MinValue;
+
         // ------------------------------------------------------------
         // PATCH 11 SUPPORT — Collected payout tracking
         // ------------------------------------------------------------
