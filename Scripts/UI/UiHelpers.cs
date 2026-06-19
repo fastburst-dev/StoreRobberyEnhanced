@@ -143,7 +143,7 @@ namespace StoreRobberyEnhanced.UI
         {
             try
             {
-                DebugLogger.Info($"[BANNER] ShowHeistPassedBanner: {title} / {subtitle} / {storeName}");
+                DebugLogger.Info($"[Banner] ShowHeistPassedBanner: {title} / {subtitle} / {storeName}");
 
                 // If storeName is provided, build the two-line subtitle
                 string finalSubtitle;
@@ -315,7 +315,7 @@ namespace StoreRobberyEnhanced.UI
         {
             try
             {
-                DebugLogger.Info($"TextNotification: {title} / {message}");
+                DebugLogger.Info($"[TEXT] TextNotification: {title} / {message}");
 
                 while (!Function.Call<bool>(Hash.HAS_STREAMED_TEXTURE_DICT_LOADED, avatar))
                 {

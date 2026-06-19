@@ -1611,7 +1611,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (store == null)
                     return;
 
-                DebugLogger.Info($"BeginCooldown({store.Id})");
+                DebugLogger.Info($"[CoolDown] BeginCooldown({store.Id})");
 
                 bool wasDebugEscape = _debugEscapeActive;
 
