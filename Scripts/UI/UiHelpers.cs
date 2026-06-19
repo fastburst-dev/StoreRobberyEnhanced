@@ -569,7 +569,7 @@ namespace StoreRobberyEnhanced.UI
 
                 // Online-style bottom placement
                 _instructionalButtons.CallFunction("SET_BACKGROUND_COLOUR", 0, 0, 0, 80);
-                _instructionalButtons.CallFunction("SET_POSITION", 0.5f, 0.95f);
+                _instructionalButtons.CallFunction("SET_POSITION", 0.50f, 0.95f);
 
                 // ⭐ FIX — allow scaleform to initialize before first render
                 Script.Yield();

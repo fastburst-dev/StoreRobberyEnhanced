@@ -172,23 +172,35 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
+        // Reset Clerk clean up and decals removals
         private void ResetClerk(TrackedStore store)
         {
             try
             {
                 Ped clerk = store.Clerk;
 
-                // Delete old clerk safely
+                // ------------------------------------------------------------
+                // ⭐ DELETE OLD CLERK + CLEAN DECALS AT CLERK POSITION
+                // ------------------------------------------------------------
                 if (clerk != null && clerk.Exists())
                 {
+                    Vector3 cleanupPos = clerk.Position;
+
                     Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, clerk);
                     clerk.MarkAsNoLongerNeeded();
                     clerk.Delete();
+
+                    // ⭐ CLEAN UP BLOOD / BULLET HOLES / DECALS AT CLERK LOCATION
+                    Function.Call(Hash.REMOVE_DECALS_IN_RANGE,
+                        cleanupPos.X, cleanupPos.Y, cleanupPos.Z,
+                        5.0f); // 5m radius around clerk
                 }
 
                 store.Clerk = null;
 
-                // Reset all clerk state flags
+                // ------------------------------------------------------------
+                // ⭐ RESET ALL CLERK STATE FLAGS
+                // ------------------------------------------------------------
                 store.ClerkReacted = false;
                 store.ClerkFleeing = false;
                 store.ClerkPanicking = false;
@@ -202,17 +214,26 @@ namespace StoreRobberyEnhanced.Systems
                 store.ClerkAnimDurationMs = 0;
                 store.ClerkAnimStartUtc = DateTime.UtcNow;
 
-                // Delete dummy clerk if still present
+                // ------------------------------------------------------------
+                // ⭐ DELETE DUMMY CLERK IF PRESENT
+                // ------------------------------------------------------------
                 if (store.DummyClerk != null && store.DummyClerk.Exists())
                 {
                     store.DummyClerk.Delete();
                     store.DummyClerk = null;
                 }
 
-                // Spawn a fresh clerk
-                _ctx.Clerks.ForceSpawnClerk(store);
+                // ------------------------------------------------------------
+                // ⭐ CLEAN THE ENTIRE STORE INTERIOR (DECALS ONLY)
+                // ------------------------------------------------------------
+                Function.Call(Hash.REMOVE_DECALS_IN_RANGE,
+                    store.StorePos.X, store.StorePos.Y, store.StorePos.Z,
+                    store.Radius); // full store radius cleanup
 
-                // DebugLogger.Info($"[RESET] Clerk respawned cleanly for store {store.Id}");
+                // ------------------------------------------------------------
+                // ⭐ SPAWN A FRESH CLERK
+                // ------------------------------------------------------------
+                _ctx.Clerks.ForceSpawnClerk(store);
             }
             catch (Exception ex)
             {
