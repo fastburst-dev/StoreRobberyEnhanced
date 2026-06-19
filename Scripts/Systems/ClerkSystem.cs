@@ -20,6 +20,10 @@ namespace StoreRobberyEnhanced.Systems
         private readonly SpeechManagerSystem _speech = new();
 
         private DateTime _nextPoliceCallAttempt = DateTime.MinValue;
+        private bool _silentAlarmEvaluatedThisRobbery = false;
+        // Cooldown for silent alarm attempts (shared across stores)
+        private DateTime _nextSilentAlarmAttempt = DateTime.MinValue;
+
 
         public ClerkSystem(StoreContext ctx)
         {
@@ -1093,7 +1097,7 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ FULL ROBBERY START FLAGS (missing before)
                 //store.IsRobbed = true;
                 store.IsRobberyActive = true;
-                store.PendingCompletion = true;
+                //store.PendingCompletion = true;
 
                 store.ClerkReacted = true;
                 store.ClerkIdle = false;
@@ -1132,6 +1136,7 @@ namespace StoreRobberyEnhanced.Systems
                 // Stall
                 if (store.ReactionType == ClerkReactionType.NormalPanic)
                     store.ClerkStalling = true;
+
                 store.StallStartUtc = DateTime.UtcNow;
                 store.StallDurationMs = _rng.Next(3000, 7000);
 
@@ -1966,7 +1971,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // SILENT ALARM
+        // SILENT ALARM (PATCHED: GRACE WINDOW + COOLDOWN + ROBBERY CHECK)
         // ------------------------------------------------------------
         private void TryTriggerSilentAlarm(TrackedStore store, Ped clerk)
         {
@@ -1975,42 +1980,53 @@ namespace StoreRobberyEnhanced.Systems
                 if (store == null || clerk == null || !clerk.Exists())
                     return;
 
+                // Already pressed once
                 if (store.SilentAlarmPressed)
                     return;
 
+                // Clerk must have reacted to the robbery
                 if (!store.ClerkReacted)
                     return;
 
-                // Block during surrender
+                // Do not trigger during surrender
                 if (store.ClerkSurrender || store.ClerkSurrenderStage > 0)
                     return;
 
-                // ⭐ NEW — Block if clerk is busy with ANY animation
-                if (IsClerkBusy(clerk))
+                // Do not trigger for stealth/silent robberies
+                if (store.SilentRobbery)
                     return;
 
-                // ⭐ NEW — Block if player is aiming at clerk
-                if (_ctx.Player.IsAiming())
+                // Must actually be in an active robbery
+                if (!store.IsRobberyActive)
                     return;
 
-                // ⭐ NEW — Cooldown between alarm attempts
-                if (store.LastSilentAlarmAttemptUtc > DateTime.UtcNow)
+                // Global cooldown between alarm attempts
+                if (DateTime.UtcNow < _nextSilentAlarmAttempt)
                     return;
 
-                // Set next attempt window (8 seconds)
-                store.LastSilentAlarmAttemptUtc = DateTime.UtcNow.AddSeconds(8);
+                // Grace period after robbery start before alarm can be pressed
+                if (store.RobberyStartUtc != DateTime.MinValue)
+                {
+                    var sinceStart = (DateTime.UtcNow - store.RobberyStartUtc).TotalSeconds;
+                    if (sinceStart < 10) // 10s grace window
+                        return;
+                }
 
-                // ⭐ NEW — Lower chance dramatically (1–3%)
-                int chance = store.ClerkRecognizedPlayer ? 3 : 1;
+                // Chance-based trigger (still low, but not spammed every tick)
+                int chance = store.ClerkRecognizedPlayer ? 5 : 2;
                 if (_rng.Next(0, 100) >= chance)
+                {
+                    // Even on a failed roll, don't re-roll every frame
+                    _nextSilentAlarmAttempt = DateTime.UtcNow.AddSeconds(10);
                     return;
+                }
 
                 // Mark alarm pressed
                 store.SilentAlarmPressed = true;
                 store.SilentAlarmUtc = DateTime.UtcNow;
 
-                // Clear tasks so animation can play
-                //clerk.Task.ClearAllImmediately();
+                // Next attempt far in the future (effectively one-shot per robbery)
+                _nextSilentAlarmAttempt = DateTime.UtcNow.AddMinutes(5);
 
                 if (!clerk.IsRagdoll && !store.ClerkFleeing)
                     clerk.Task.ClearAll();
@@ -2039,7 +2055,7 @@ namespace StoreRobberyEnhanced.Systems
                 store.ClerkAnimStartUtc = DateTime.UtcNow;
                 store.ClerkAnimDurationMs = 1500;
 
-                // ⭐ After animation finishes, clerk will hold idle pose
+                // After animation finishes, clerk will hold idle pose
                 Script.Wait(1500);
                 if (clerk != null && clerk.Exists())
                 {
@@ -2057,9 +2073,6 @@ namespace StoreRobberyEnhanced.Systems
                     );
                 }
 
-                //// Trigger police response
-                //Game.Player.WantedLevel = Math.Max(Game.Player.WantedLevel, 2);
-
                 // Speech
                 SafePlaySpeech(clerk, _speech.Get("SilentAlarm"), "SPEECH_PARAMS_FORCE");
 
@@ -2072,7 +2085,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // POLICE CALL (PATCH 8B APPLIED)
+        // POLICE CALL (PATCH 8B APPLIED + EXTRA SAFETY)
         // ------------------------------------------------------------
         private void TryTriggerPoliceCall(TrackedStore store, Ped clerk, Ped player)
         {
@@ -2081,6 +2094,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (store == null || clerk == null || !clerk.Exists() || player == null || !player.Exists())
                     return;
 
+                // ⭐ PATCH 8B — HEAT SAFETY GUARDS
                 if (_ctx.Police.SuppressPoliceForDebug)
                     return;
 
@@ -2090,13 +2104,13 @@ namespace StoreRobberyEnhanced.Systems
                 if (store.CooldownActive)
                     return;
 
+                // Do not call police for stealth/silent robberies
                 if (store.SilentRobbery)
                     return;
 
                 if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
                     return;
 
-                // Block during active clerk phases
                 if (store.ClerkStalling || store.ClerkOpeningRegister || store.ClerkGrabbingCash || store.ClerkThrowingBag)
                     return;
 
@@ -2112,38 +2126,38 @@ namespace StoreRobberyEnhanced.Systems
                 // Player still threatening → clerk does NOT call police
                 if (PlayerThreatValid(store, clerk, player))
                     return;
-                //if (_ctx.Player.IsThreatening(clerk))
-                //    return;
 
                 if (!store.IsRobberyActive)
                     return;
 
-                // ⭐ Only call police if player LEFT the store
+                // Only consider police call once the robbery has been going for a bit
+                if (store.RobberyStartUtc != DateTime.MinValue)
+                {
+                    var sinceStart = (DateTime.UtcNow - store.RobberyStartUtc).TotalSeconds;
+                    if (sinceStart < 15) // 15s grace before police call logic
+                        return;
+                }
+
+                // If player leaves the store radius, clerk may call police
                 if (!store.IsPlayerInsideStore)
                 {
-                    // ⭐ NEW — Cooldown between police call attempts
                     if (DateTime.UtcNow < _nextPoliceCallAttempt)
                         return;
 
-                    _nextPoliceCallAttempt = DateTime.UtcNow.AddSeconds(10); // 10s cooldown
                     store.GreetedPlayer = false;
 
-                    // ⭐ NEW — Lower chance dramatically (1–5%)
-                    int chance = store.ClerkRecognizedPlayer ? 5 : 2;
-                    if (_rng.Next(0, 100) >= chance)
-                        return;
+                    _nextPoliceCallAttempt = DateTime.UtcNow.AddSeconds(10); // slightly longer cooldown
 
-                    store.ClerkCallingPolice = true;
-                    store.ClerkCallStartUtc = DateTime.UtcNow;
+                    int chance = store.ClerkRecognizedPlayer ? 10 : 2;
+                    if (_rng.Next(0, 100) < chance)
+                    {
+                        store.ClerkCallingPolice = true;
+                        store.ClerkCallStartUtc = DateTime.UtcNow;
 
-                    SafePlaySpeech(clerk, _speech.Get("SilentAlarm"), "SPEECH_PARAMS_FORCE");
+                        SafePlaySpeech(clerk, _speech.Get("SilentAlarm"), "SPEECH_PARAMS_FORCE");
 
-                    //// ⭐ PATCH 8B — SAFE HEAT INCREMENT
-                    //store.HeatLevel += 1;
-                    //Game.Player.WantedLevel = Math.Max(Game.Player.WantedLevel, 2);
-
-                    DebugLogger.Info($"Police called for robbery at store {store.Id}");
-                    
+                        DebugLogger.Info($"Police called for robbery at store {store.Id}");
+                    }
                 }
             }
             catch (Exception ex)

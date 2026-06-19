@@ -45,8 +45,18 @@ namespace StoreRobberyEnhanced.Minigame
         // ------------------------------------------------------------
         public void ResetState()
         {
+            // Only reset internal minigame state; do NOT re-suppress store here
             IsRunning = false;
-            SuppressStoreSystems();
+
+            _state.Reset();
+            _state.Active = false;
+            _state.Completed = false;
+            _state.Failed = false;
+            _state.ConfirmRequested = false;
+
+            _savedCameraMode = -1;
+            _playerFrozen = false;
+            _store = null;
         }
 
         // ------------------------------------------------------------
@@ -135,6 +145,9 @@ namespace StoreRobberyEnhanced.Minigame
                 _state.StartTime = Game.GameTime;
                 _state.LastUpdateTime = Game.GameTime;
 
+                // Mark running for RobberySystem guards
+                IsRunning = true;
+
                 // ------------------------------------------------------------
                 // ⭐ RE‑ENABLE SAFETY UI DRAWING
                 // ------------------------------------------------------------
@@ -192,6 +205,7 @@ namespace StoreRobberyEnhanced.Minigame
             {
                 DebugLogger.LogException("SafeCrackController.Start", ex);
                 _state.Active = false;
+                IsRunning = false;
             }
         }
 
@@ -291,6 +305,32 @@ namespace StoreRobberyEnhanced.Minigame
             }
         }
 
+        /// ------------------------------------------------------------
+        // RESTORE STORE SYSTEMS (UNDO STEALTH SUPPRESSION)
+        // ------------------------------------------------------------
+        private void RestoreStoreSystems()
+        {
+            if (_store == null)
+                return;
+
+            // Restore normal robbery mode
+            _store.SilentRobbery = false;
+
+            // Allow RobberySystem to resume normal loud robbery flow
+            _store.AlarmTriggered = false;
+            _store.ClerkCallingPolice = false;
+            _store.SilentAlarmPressed = false;
+
+            // Reset escalation flags
+            _store.HeatLevel = 0;
+            _store.RepeatRobberyEscalationApplied = false;
+            _store.MaskEscalationApplied = false;
+            _store.FightEscalationApplied = false;
+            _store.TimeEscalationApplied = false;
+
+            DebugLogger.Info("[SafeCrack] Store systems restored after safecrack");
+        }
+
         // ------------------------------------------------------------
         // SUCCESS HANDLER
         // ------------------------------------------------------------
@@ -301,6 +341,7 @@ namespace StoreRobberyEnhanced.Minigame
 
             _state.Completed = true;
             _state.Active = false;
+            IsRunning = false;
 
             _anim.EndSuccess(_state.Player);
 
@@ -348,7 +389,8 @@ namespace StoreRobberyEnhanced.Minigame
 
             if (_store != null)
             {
-                _store.SilentRobbery = false;
+                // ⭐ Ensure store systems are restored
+                RestoreStoreSystems();
 
                 if (IsDebugMode())
                 {
@@ -363,7 +405,7 @@ namespace StoreRobberyEnhanced.Minigame
         }
 
         // ------------------------------------------------------------
-        // STOP MINIGAME
+        // STOP MINIGAME (FULLY PATCHED)
         // ------------------------------------------------------------
         public void Stop(bool success)
         {
@@ -396,15 +438,13 @@ namespace StoreRobberyEnhanced.Minigame
             _anim.End(_state.Player, success);
             _ui.Clear();
 
-            // ⭐ NEW: always kill the SafeCrack timer UI when the minigame stops
+            // ⭐ Always kill the SafeCrack timer UI when the minigame stops
             StoreContext.GlobalUi.ClearTimer();
 
             RestoreControls();
 
-            if (_store != null)
-            {
-                _store.SilentRobbery = false;
-            }
+            // ⭐ NEW — Restore store systems so robbery can resume normally
+            RestoreStoreSystems();
 
             if (!success && !_state.Completed)
             {
@@ -473,6 +513,10 @@ namespace StoreRobberyEnhanced.Minigame
             if (_store == null)
                 return;
 
+            // If already in stealth mode and robbery active, don't spam log or re-apply
+            if (_store.SilentRobbery && _store.IsRobberyActive)
+                return;
+
             _store.IsRobberyActive = true;
             _store.SilentRobbery = true;
 
@@ -488,5 +532,6 @@ namespace StoreRobberyEnhanced.Minigame
 
             DebugLogger.Info("[SafeCrack] Store systems suppressed for stealth safecrack");
         }
+
     }
 }
