@@ -400,14 +400,16 @@ v2.6.9.7
  * Added Clerk Dialog notifications for robbery
  * Updated various logic improvements
 
-v2.7.0.1
+v2.7.0.2
  * Added new config option for Stalker Messages Types = 1 chat box, 2 Email, 3 Add Friend Request or 0 None Right corner icons
  * Added additional new Stalker messages now each section has over 60 messages pre-programmed
+ * Added config option to Enable/Disable Blips system for maps per request
  * Updated code logic to support new setting
- * Updated Mission Banner to stay on screen until you press the buttons on bottom right
- * 
- * 
- * 
+ * Updated Mission Banner to stay on screen until you press the buttons on bottom right - Mission Pass will autoclose after 30 secs if buttons/keys are not pressed A/Enter B/Esc
+ * Updated ini configs and logic
+ * Fixed issues with Robbery Timer stopping after SafeCrack Minigame in some situations
+ * Fixed Subtitle Issues not showing for all robbery styles
+ * Adjusted SilientAlarm and CallPolice logics to be lower by chance.
 
 ⭐ CREDITS
 Created by James Neeley (FastBurst)  

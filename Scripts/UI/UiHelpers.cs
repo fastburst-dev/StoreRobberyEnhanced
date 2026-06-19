@@ -163,7 +163,7 @@ namespace StoreRobberyEnhanced.UI
                     Type = BannerType.HeistPassed,
                     Title = title,
                     Subtitle = finalSubtitle,
-                    DurationMs = 600000,
+                    DurationMs = 30000,
                     PlaySound = true,
                     AllowManualClose = true,
                     MinDisplayMs = 3000
