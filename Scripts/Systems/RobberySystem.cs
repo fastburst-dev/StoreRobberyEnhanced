@@ -456,7 +456,7 @@ namespace StoreRobberyEnhanced.Systems
                 }
 
                 // ------------------------------------------------------------
-                // ⭐ PATCHED SAFECRACK START VALIDATION (Silent + Loud)
+                // ⭐ PATCHED SAFECRACK START VALIDATION (Silent + Loud + Dynamic Input)
                 // ------------------------------------------------------------
                 if (store.IsRobbed &&
                     store.SafePos != Vector3.Zero &&
@@ -466,25 +466,44 @@ namespace StoreRobberyEnhanced.Systems
                     if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
                         return;
 
+                    // ⭐ Detect input mode (Keyboard vs Controller)
+                    bool usingController = Function.Call<bool>(Hash.IS_USING_KEYBOARD_AND_MOUSE, 2) == false;
+
+                    // ⭐ Unified input detection
+                    bool pressedInteract =
+                        Game.IsControlJustPressed(GTA.Control.Context) ||      // Keyboard: E
+                        Game.IsControlJustPressed(GTA.Control.FrontendAccept); // Controller: A
+
+                    // ------------------------------------------------------------
                     // ⭐ SILENT ROBBERY SAFECRACK
+                    // ------------------------------------------------------------
                     if (store.SilentRobbery)
                     {
                         float safeDistSilent = player.Position.DistanceTo(store.SafePos);
-                        if (safeDistSilent > 1.2f)
-                            return;
 
-                        _ctx.Ui.ShowHelpText("Press ~y~E~w~ to crack the safe");
-
-                        if (Game.IsControlJustPressed(GTA.Control.Context))
+                        // ⭐ ONLY show prompt when close enough
+                        if (safeDistSilent <= 1.2f)
                         {
-                            DebugLogger.Info($"[PATCH N] Starting SafeCrack (SILENT) at store {store.Id}");
-                            _ctx.SafeCrack.Start(store, store.SafePos, store.SafeHeading, player);
+                            if (usingController)
+                                _ctx.Ui.ShowHelpText("Press ~INPUT_FRONTEND_ACCEPT~ to crack the safe");
+                            else
+                                _ctx.Ui.ShowHelpText("Press ~y~E~w~ to crack the safe");
+
+                            if (pressedInteract)
+                            {
+                                DebugLogger.Info($"[PATCH N] Starting SafeCrack (SILENT) at store {store.Id}");
+                                _ctx.SafeCrack.Start(store, store.SafePos, store.SafeHeading, player);
+                            }
                         }
 
                         return;
                     }
 
-                    // ⭐ LOUD ROBBERY VALIDATION
+                    // ------------------------------------------------------------
+                    // ⭐ LOUD ROBBERY SAFECRACK
+                    // ------------------------------------------------------------
+
+                    // Clerk ragdoll check
                     if (store.Clerk != null && store.Clerk.Exists() && store.Clerk.IsRagdoll)
                         return;
 
@@ -492,17 +511,21 @@ namespace StoreRobberyEnhanced.Systems
                     if (store.ClerkOpeningRegister || store.ClerkGrabbingCash || store.ClerkThrowingBag)
                         return;
 
-                    // Player must be close enough to interact with the safe
                     float safeDist = player.Position.DistanceTo(store.SafePos);
-                    if (safeDist > 1.2f)
-                        return;
 
-                    _ctx.Ui.ShowHelpText("Press ~y~E~w~ to crack the safe");
-
-                    if (Game.IsControlJustPressed(GTA.Control.Context))
+                    // ⭐ ONLY show prompt when close enough
+                    if (safeDist <= 1.2f)
                     {
-                        DebugLogger.Info($"[PATCH N] Starting SafeCrack (LOUD) at store {store.Id}");
-                        _ctx.SafeCrack.Start(store, store.SafePos, store.SafeHeading, player);
+                        if (usingController)
+                            _ctx.Ui.ShowHelpText("Press ~INPUT_FRONTEND_ACCEPT~ to crack the safe");
+                        else
+                            _ctx.Ui.ShowHelpText("Press ~y~E~w~ to crack the safe");
+
+                        if (pressedInteract)
+                        {
+                            DebugLogger.Info($"[PATCH N] Starting SafeCrack (LOUD) at store {store.Id}");
+                            _ctx.SafeCrack.Start(store, store.SafePos, store.SafeHeading, player);
+                        }
                     }
                 }
 

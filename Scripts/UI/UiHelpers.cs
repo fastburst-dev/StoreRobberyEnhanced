@@ -443,6 +443,9 @@ namespace StoreRobberyEnhanced.UI
                                     ("Exit (Esc)", Control.FrontendCancel)
                                 );
                             }
+
+                            // ⭐ FIX — allow scaleform to warm up before first render
+                            Script.Yield();
                         }
 
                         _instructionalAlpha = Math.Min(_instructionalAlpha + 0.02f, 1f);
@@ -567,6 +570,10 @@ namespace StoreRobberyEnhanced.UI
                 // Online-style bottom placement
                 _instructionalButtons.CallFunction("SET_BACKGROUND_COLOUR", 0, 0, 0, 80);
                 _instructionalButtons.CallFunction("SET_POSITION", 0.5f, 0.95f);
+
+                // ⭐ FIX — allow scaleform to initialize before first render
+                Script.Yield();
+
                 _instructionalButtons.CallFunction("DRAW_INSTRUCTIONAL_BUTTONS", -1);
 
             }
