@@ -413,6 +413,13 @@ v2.7.0.2
  * Fixed Subtitle Issues not showing for all robbery styles
  * Adjusted SilientAlarm and CallPolice logics to be lower by chance.
 
+v2.7.0.3
+ * Fixed issues with abandoning the robbery didnt kill the robbery
+ * Fixed issues with if you cancelled the safecracking minigame, player was stuck in place
+ * Fixed issues with if safecracking minigame was cancelled robbery was stuck couldnt cracck safe again
+ * Fixed issues with Silent robbery not triggering animations
+ * Expanded Debugging logic and logging to be more detailed if enabled
+
 ⭐ CREDITS
 Created by James Neeley (FastBurst)  
 GTA V Mod Developer & Systems Architect
