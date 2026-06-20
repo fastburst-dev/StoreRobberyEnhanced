@@ -387,12 +387,32 @@ namespace StoreRobberyEnhanced.Minigame
         // ------------------------------------------------------------
         private void FailAndResetStore()
         {
+            // ⭐ Prevent double-fail
+            if (!_state.Active && !IsRunning)
+            {
+                DebugLogger.Info("[SafeCrack] Fail ignored — already stopped");
+                return;
+            }
+
             Stop(false);
 
             if (_store != null)
             {
                 // ⭐ Ensure store systems are restored
                 RestoreStoreSystems();
+
+                // ⭐ Restore robbery state so SafeCrack can be retried
+                _store.IsRobbed = true;
+                _store.IsRobberyActive = true;
+                _store.PendingCompletion = true;
+
+                // ⭐ Safe must be uncracked
+                _store.SafeCracked = false;
+
+                // ⭐ Allow retry immediately
+                _state.CooldownActive = false;
+                _state.CooldownEndTime = 0;
+
 
                 if (IsDebugMode())
                 {
@@ -411,8 +431,18 @@ namespace StoreRobberyEnhanced.Minigame
         // ------------------------------------------------------------
         public void Stop(bool success)
         {
+            // ⭐ Immediately mark as not running so double-stop guard works
+            IsRunning = false;
+
+            // ⭐ Prevent double-stop
+            if (!_state.Active)
+            {
+                DebugLogger.Info("[SafeCrack] Stop() ignored — already stopped");
+                return;
+            }
+
             _state.Active = false;
-            StoreContext.Active.SafeState.Active = false;   // ⭐ CRITICAL FIX
+            StoreContext.Active.SafeState.Active = false;
             _state.ConfirmRequested = false;
 
             if (Game.IsLoading)

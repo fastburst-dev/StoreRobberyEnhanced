@@ -601,7 +601,7 @@ namespace StoreRobberyEnhanced.Systems
                             if (usingController)
                                 _ctx.Ui.ShowHelpText("Press ~INPUT_FRONTEND_ACCEPT~ to crack the safe");
                             else
-                                _ctx.Ui.ShowHelpText("Press ~y~E~w~ to crack the safe");
+                                _ctx.Ui.ShowHelpText("Press ~INPUT_CONTEXT~ to crack the safe");
 
                             if (pressedInteract)
                             {
@@ -632,7 +632,7 @@ namespace StoreRobberyEnhanced.Systems
                         if (usingController)
                             _ctx.Ui.ShowHelpText("Press ~INPUT_FRONTEND_ACCEPT~ to crack the safe");
                         else
-                            _ctx.Ui.ShowHelpText("Press ~y~E~w~ to crack the safe");
+                            _ctx.Ui.ShowHelpText("Press ~INPUT_CONTEXT~ to crack the safe");
 
                         if (pressedInteract)
                         {
