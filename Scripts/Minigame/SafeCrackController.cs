@@ -434,11 +434,10 @@ namespace StoreRobberyEnhanced.Minigame
             // ⭐ Immediately mark as not running so double-stop guard works
             IsRunning = false;
 
-            // ⭐ Prevent double-stop
+            // ⭐ Allow Stop() to run even if Active was cleared by FinishSuccess()
             if (!_state.Active)
             {
-                DebugLogger.Info("[SafeCrack] Stop() ignored — already stopped");
-                return;
+                DebugLogger.Info("[SafeCrack] Stop() continuing — Active already false (expected after success)");
             }
 
             _state.Active = false;

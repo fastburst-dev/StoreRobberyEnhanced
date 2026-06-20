@@ -867,6 +867,40 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
+        // FORCE SPEECH (Overrides blocking tasks safely)
+        // ------------------------------------------------------------
+        public void ForceSpeech(Ped ped, string speechName, string speechParam)
+        {
+            if (ped == null || !ped.Exists())
+                return;
+
+            try
+            {
+                // Clear ONLY blocking tasks (not full CLEAR_ALL)
+                Function.Call(Hash.CLEAR_PED_SECONDARY_TASK, ped);
+
+                // HandsUp, Cower, Combat, GoStraightTo, and full-body anims
+                Function.Call(Hash.CLEAR_PED_TASKS_IMMEDIATELY, ped);
+
+                Script.Wait(50); // allow ped to enter a speak-safe state
+
+                // Play speech
+                Function.Call(
+                    Hash.PLAY_PED_AMBIENT_SPEECH_NATIVE,
+                    ped.Handle,
+                    speechName,
+                    speechParam,
+                    0
+                );
+            }
+            catch (Exception ex)
+            {
+                DebugLogger.LogException("ClerkSystem.ForceSpeech", ex);
+            }
+        }
+
+
+        // ------------------------------------------------------------
         // SILENT ROBBERY COSMETIC ANIM
         // ------------------------------------------------------------
         public void PlaySilentRobberyAnim(TrackedStore store)
@@ -983,7 +1017,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // SMALL HELPER: GREETING SPEECH
+        // SMALL HELPER: GREETING SPEECH (FORCE SPEECH PATCHED)
         // ------------------------------------------------------------
         private void PlayClerkEntryGreeting(TrackedStore store, Ped clerk)
         {
@@ -1007,8 +1041,11 @@ namespace StoreRobberyEnhanced.Systems
                 // Mark greeted
                 store.GreetedPlayer = true;
 
-                // ⭐ Play greeting speech
-                SafePlaySpeech(clerk, _speech.Get("Idle"), "SPEECH_PARAMS_FORCE");
+                // ⭐ FORCE SPEECH (guaranteed)
+                ForceSpeech(clerk, _speech.Get("Idle"), "SPEECH_PARAMS_FORCE");
+
+                // ⭐ Small buffer so speech isn't eaten
+                Script.Wait(50);
 
                 // ⭐ Optional: small upper-body wave animation (safe)
                 Function.Call(Hash.REQUEST_ANIM_DICT, "gestures@m@standing@casual");
@@ -1023,7 +1060,7 @@ namespace StoreRobberyEnhanced.Systems
                         4.0f,
                         -4.0f,
                         1500,
-                        (int)(AnimationFlags.Loop | AnimationFlags.UpperBodyOnly),
+                        (int)(AnimationFlags.UpperBodyOnly),
                         0f,
                         false, false, false
                     );
@@ -1148,10 +1185,10 @@ namespace StoreRobberyEnhanced.Systems
                 store.ClerkIdle = false;
 
                 clerk.Task.ClearAllImmediately();
-                
+
                 //Function.Call(Hash.PLAY_PED_AMBIENT_SPEECH_NATIVE, clerk, "SHOP_CLERK_REACT", "SPEECH_PARAMS_FORCE", 0);
                 SafePlaySpeech(clerk, _speech.Get("Threat"), "SPEECH_PARAMS_FORCE");
-                
+
                 clerk.Task.HandsUp(-1);
 
                 // Recognition escalation
@@ -1193,7 +1230,7 @@ namespace StoreRobberyEnhanced.Systems
             {
                 DebugLogger.LogException("ClerkSystem.BeginFearReaction", ex);
             }
-        }        
+        }
 
         // ------------------------------------------------------------
         // STALL PROCESSING (PATCH 9A + PATCH F + PATCH G APPLIED)
@@ -1460,7 +1497,7 @@ namespace StoreRobberyEnhanced.Systems
                 // STILL IN PREVIOUS PHASE?
                 if ((DateTime.UtcNow - store.ClerkAnimStartUtc).TotalMilliseconds < store.ClerkAnimDurationMs)
                     return;
-                
+
                 // Safety: only clear tasks if clerk is stable
                 if (!clerk.IsRagdoll && !store.ClerkFleeing)
                     clerk.Task.ClearAllImmediately();
@@ -1791,7 +1828,7 @@ namespace StoreRobberyEnhanced.Systems
 
                     _ctx.Ui.ShowNotification("~y~The clerk is surrendering!~s~ Grab the bag, crack the safe and get out of there!");
                     DebugLogger.Info($"[AMIN 2] Clerk at store {store.Id} started surrender sequence.");
-                }                
+                }
             }
             catch (Exception ex)
             {
@@ -1819,7 +1856,7 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ PATCH P — Ragdoll recovery
                 if (HandleClerkRagdoll(store))
                     return;
-               
+
                 // ⭐ PATCH S — Animation integrity enforcement (HandsUp must persist)
                 if (store.ClerkSurrenderStage >= 3) // hands-up or final idle
                 {
@@ -1904,7 +1941,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // FIGHT OR FLIGHT PISTOL / SHOTGUN (PATCH 9F+DISTANCE APPLIED)
+        // FIGHT OR FLIGHT PISTOL / SHOTGUN (FORCE SPEECH PATCHED)
         // ------------------------------------------------------------
         private void ProcessFeelingFroggy(TrackedStore store, Ped clerk)
         {
@@ -1917,13 +1954,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (_ctx.Police.SuppressPoliceForDebug)
                     return;
 
-                if (store.RobberyEnded)
-                    return;
-
-                if (store.CooldownActive)
-                    return;
-
-                if (store.SilentRobbery)
+                if (store.RobberyEnded || store.CooldownActive || store.SilentRobbery)
                     return;
 
                 if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
@@ -1943,70 +1974,77 @@ namespace StoreRobberyEnhanced.Systems
 
                 // ⭐ Distance gate — allow reaction from doorway
                 float dist = clerk.Position.DistanceTo(player.Position);
-                if (dist > 22.5f) // try 20–25f for door-range
+                if (dist > 22.5f)
                     return;
 
-                // ⭐ LOS — relax this, door/glass often blocks flag 17
+                // ⭐ LOS — relaxed
                 bool los = Function.Call<bool>(
                     Hash.HAS_ENTITY_CLEAR_LOS_TO_ENTITY,
                     clerk.Handle,
                     player.Handle,
-                    1 // more permissive than 17
+                    1
                 );
-                // If this is still too strict, temporarily comment this out to confirm:
-                // if (!los)
-                //     return;
 
-                // ⭐ Facing — only block if really turned away
+                // ⭐ Facing — only reject if facing > ~105° away
                 Vector3 toPlayer = (player.Position - clerk.Position).Normalized;
                 float dot = Vector3.Dot(clerk.ForwardVector, toPlayer);
-                if (dot < -0.25f) // only reject if facing > ~105° away
+                if (dot < -0.25f)
                     return;
 
                 // ⭐ Must not be in another phase
-                if (store.ClerkStalling || store.ClerkOpeningRegister || store.ClerkGrabbingCash || store.ClerkThrowingBag || store.ClerkPanicking)
+                if (store.ClerkStalling || store.ClerkOpeningRegister || store.ClerkGrabbingCash ||
+                    store.ClerkThrowingBag || store.ClerkPanicking)
                     return;
 
-                // ⭐ Force clerk into combat-ready state
+                // ⭐ Combat attributes
                 clerk.BlockPermanentEvents = false;
                 clerk.AlwaysKeepTask = false;
                 clerk.IsPositionFrozen = false;
 
-                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 46, true); // Always fight
-                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 5, true);  // Can fight armed
-                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 1, true);  // Use cover
-                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 3, true);  // Aggressive
-                Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, clerk.Handle, 0, false);   // Disable flee
-                Function.Call(Hash.SET_PED_COMBAT_ABILITY, clerk.Handle, 2);           // Professional
-                Function.Call(Hash.SET_PED_COMBAT_MOVEMENT, clerk.Handle, 2);          // Offensive
-                Function.Call(Hash.SET_PED_COMBAT_RANGE, clerk.Handle, 2);             // Far range
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 46, true);
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 5, true);
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 1, true);
+                Function.Call(Hash.SET_PED_COMBAT_ATTRIBUTES, clerk.Handle, 3, true);
+                Function.Call(Hash.SET_PED_FLEE_ATTRIBUTES, clerk.Handle, 0, false);
+                Function.Call(Hash.SET_PED_COMBAT_ABILITY, clerk.Handle, 2);
+                Function.Call(Hash.SET_PED_COMBAT_MOVEMENT, clerk.Handle, 2);
+                Function.Call(Hash.SET_PED_COMBAT_RANGE, clerk.Handle, 2);
 
-                _ctx.Ui.ShowSubtitle("~r~The clerk is fighting back!~s~ Watch out, they are armed!~n~The robbery is a complete bust, get out of there while you still can!", 4000);
+                _ctx.Ui.ShowSubtitle("~r~The clerk is fighting back!~s~ Watch out!", 4000);
+
                 // ------------------------------------------------------------
-                // ⭐ FIGHT BACK
+                // ⭐ FIGHT BACK (FORCE SPEECH BEFORE COMBAT)
                 // ------------------------------------------------------------
                 switch (store.ReactionType)
                 {
                     case ClerkReactionType.FightPistol:
-                        clerk.Weapons.Give(WeaponHash.Pistol, 60, true, true);
+                        // ⭐ Clear tasks BEFORE speech
                         clerk.Task.ClearAllImmediately();
-                        Script.Wait(50);
+
+                        // ⭐ FORCE SPEECH (guaranteed)
+                        ForceSpeech(clerk, _speech.Get("Fight"), "SPEECH_PARAMS_FORCE");
+
+                        Script.Wait(80); // small buffer
+
+                        clerk.Weapons.Give(WeaponHash.Pistol, 60, true, true);
+
+                        // ⭐ Assign combat AFTER speech
                         clerk.Task.FightAgainst(player);
                         clerk.Task.Combat(player);
-                        // ⭐ Speech AFTER combat assignment
-                        Script.Wait(150); // small buffer so animation doesn’t cancel speech
-                        SafePlaySpeech(clerk, _speech.Get("Fight"), "SPEECH_PARAMS_FORCE");
                         break;
 
                     case ClerkReactionType.FightShotgun:
-                        clerk.Weapons.Give(WeaponHash.PumpShotgun, 20, true, true);
                         clerk.Task.ClearAllImmediately();
-                        Script.Wait(50);
+
+                        // ⭐ FORCE SPEECH (guaranteed)
+                        ForceSpeech(clerk, _speech.Get("Fight"), "SPEECH_PARAMS_FORCE");
+
+                        Script.Wait(80);
+
+                        clerk.Weapons.Give(WeaponHash.PumpShotgun, 20, true, true);
+
                         clerk.Task.FightAgainst(player);
                         clerk.Task.Combat(player);
-                        // ⭐ Speech AFTER combat assignment
-                        Script.Wait(150); // small buffer so animation doesn’t cancel speech
-                        SafePlaySpeech(clerk, _speech.Get("Fight"), "SPEECH_PARAMS_FORCE");
                         break;
                 }
             }
@@ -2017,7 +2055,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // SILENT ALARM (PATCHED: GRACE WINDOW + COOLDOWN + ROBBERY CHECK)
+        // SILENT ALARM (FORCE SPEECH PATCHED: GRACE WINDOW + COOLDOWN + ROBBERY CHECK)
         // ------------------------------------------------------------
         private void TryTriggerSilentAlarm(TrackedStore store, Ped clerk)
         {
@@ -2077,6 +2115,10 @@ namespace StoreRobberyEnhanced.Systems
                 if (!clerk.IsRagdoll && !store.ClerkFleeing)
                     clerk.Task.ClearAll();
 
+                // ⭐ FORCE SPEECH BEFORE ANIM (guaranteed)
+                ForceSpeech(clerk, _speech.Get("SilentAlarm"), "SPEECH_PARAMS_FORCE");
+                Script.Wait(50);
+
                 // Load keypad animation
                 Function.Call(Hash.REQUEST_ANIM_DICT, "anim@heists@keypad@");
 
@@ -2119,9 +2161,6 @@ namespace StoreRobberyEnhanced.Systems
                     );
                 }
 
-                // Speech
-                SafePlaySpeech(clerk, _speech.Get("SilentAlarm"), "SPEECH_PARAMS_FORCE");
-
                 DebugLogger.Info($"[ALARM] Silent alarm triggered at store {store.Id}");
             }
             catch (Exception ex)
@@ -2131,7 +2170,7 @@ namespace StoreRobberyEnhanced.Systems
         }
 
         // ------------------------------------------------------------
-        // POLICE CALL (PATCH 8B APPLIED + EXTRA SAFETY)
+        // POLICE CALL (FORCE SPEECH PATCHED + PATCH 8B + EXTRA SAFETY)
         // ------------------------------------------------------------
         private void TryTriggerPoliceCall(TrackedStore store, Ped clerk, Ped player)
         {
@@ -2200,7 +2239,11 @@ namespace StoreRobberyEnhanced.Systems
                         store.ClerkCallingPolice = true;
                         store.ClerkCallStartUtc = DateTime.UtcNow;
 
-                        SafePlaySpeech(clerk, _speech.Get("SilentAlarm"), "SPEECH_PARAMS_FORCE");
+                        // ⭐ Clear blocking tasks BEFORE speech
+                        clerk.Task.ClearAllImmediately();
+
+                        // ⭐ FORCE SPEECH (guaranteed)
+                        ForceSpeech(clerk, _speech.Get("SilentAlarm"), "SPEECH_PARAMS_FORCE");
 
                         DebugLogger.Info($"[ALARM] Police called for robbery at store {store.Id}");
                     }
