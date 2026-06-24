@@ -47,14 +47,14 @@ namespace StoreRobberyEnhanced.Data
                 { "meteorite", new ShopItemData("meteorite", "Meteorite", 4, ShopItemCategory.Snack, "Chocolate bar. Restores moderate health.") },
 
                 // Drinks
-                { "sprunk", new ShopItemData("sprunk", "Sprunk", 1, ShopItemCategory.Drink, "Carbonated soda. Restores 50% health.") },
-                { "e_colas", new ShopItemData("e_colas", "eCola", 1, ShopItemCategory.Drink, "Classic cola drink. Restores 50% health.") },
+                { "sprunk", new ShopItemData("sprunk", "Sprunk", 1, ShopItemCategory.Drink, "Carbonated soda. Restores 15% health.") },
+                { "e_colas", new ShopItemData("e_colas", "eCola", 1, ShopItemCategory.Drink, "Classic cola drink. Restores 15% health.") }
 
                 // Medical
-                { "bandage", new ShopItemData("bandage", "Bandage", 15, ShopItemCategory.Medical, "Stops bleeding and restores health.") },
+                //{ "bandage", new ShopItemData("bandage", "Bandage", 15, ShopItemCategory.Medical, "Stops bleeding and restores health.") }
 
                 // Utility
-                { "lighter", new ShopItemData("lighter", "Lighter", 5, ShopItemCategory.Utility, "Useful for lighting things.") }
+                //{ "lighter", new ShopItemData("lighter", "Lighter", 5, ShopItemCategory.Utility, "Useful for lighting things.") }
             };
         }
     }

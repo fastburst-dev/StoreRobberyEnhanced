@@ -112,6 +112,7 @@
     <Compile Include="Scripts\Main.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Scripts\Systems\CameraSystem.cs" />
+    <Compile Include="Scripts\Systems\ClerkExtensions.cs" />
     <Compile Include="Scripts\Systems\ClerkHelperSystem.cs" />
     <Compile Include="Scripts\Systems\ClerkReplacementSystem.cs" />
     <Compile Include="Scripts\Systems\ClerkSystem.cs" />

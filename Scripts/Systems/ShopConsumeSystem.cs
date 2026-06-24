@@ -1,10 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using GTA;
+﻿using GTA;
 using GTA.Math;
 using GTA.Native;
 using StoreRobberyEnhanced.Debug;
+using StoreRobberyEnhanced.Scripts.Systems;
 using StoreRobberyEnhanced.UI;
+using System;
+using System.Collections.Generic;
 
 namespace StoreRobberyEnhanced.Systems
 {
@@ -98,6 +99,48 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
+        private string GetPropModelForItem(string itemId)
+        {
+            switch (itemId)
+            {
+                case "sprunk":
+                    return "prop_ld_can_01";          // Sprunk can
+
+                case "e_colas":
+                    return "prop_ecola_can";          // Ecola can
+
+                case "egochaser":
+                    return "prop_choc_ego";           // EgoChaser bar
+
+                case "ps_and_qs":
+                    return "prop_candy_pqs";          // Ps & Qs bar
+
+                case "meteorite":
+                    return "prop_choc_ego";           // Meteorite bar
+
+                default:
+                    return "prop_ecola_can";
+            }
+        }
+
+        private (string dict, string anim) GetAnimationForItem(string itemId)
+        {
+            switch (itemId)
+            {
+                case "sprunk":
+                case "e_colas":
+                    return ("mini@sprunk", "PLYR_BUY_DRINK_PT2");
+
+                case "egochaser":
+                case "ps_and_qs":
+                case "meteorite":
+                    return ("mp_player_inteat@burger", "mp_player_int_eat_burger_left");
+
+                default:
+                    return ("mini@sprunk", "PLYR_BUY_DRINK_PT2");
+            }
+        }
+
         // ============================================================
         // CONSUME HANDLING
         // ============================================================
@@ -107,6 +150,10 @@ namespace StoreRobberyEnhanced.Systems
             {
                 Ped player = Game.Player.Character;
 
+                var store = _ctx.GetNearestStore();
+                if (store == null)
+                    return;
+
                 if (PlayerHelper.IsPlayerBusy(player))
                 {
                     DebugLogger.Warn("ShopConsumeSystem: Player busy, skipping consumption.");
@@ -115,34 +162,179 @@ namespace StoreRobberyEnhanced.Systems
 
                 DebugLogger.Info($"[SHOP] ShopConsumeSystem: Consuming '{itemId}'");
 
-                // ------------------------------------------------------------
-                // LOAD ANIMATION
-                // ------------------------------------------------------------
-                const string animDict = "mp_player_inteat@burger";
-                const string animName = "mp_player_int_eat_burger";
+                Game.Player.CanControlCharacter = true;
+                player.Task.ClearAllImmediately();
+                player.PlayAmbientSpeech("GENERIC_BUY", false, null);
 
+                // ------------------------------------------------------------
+                // RESOLVE ANIMATION + PROP
+                // ------------------------------------------------------------
+                var (animDict, animName) = GetAnimationForItem(itemId);
                 PlayerHelper.RequestAnimDict(animDict);
 
-                // ------------------------------------------------------------
-                // CREATE PROP (CHOCOLATE BAR)
-                // ------------------------------------------------------------
-                int propHash = Function.Call<int>(Hash.GET_HASH_KEY, "prop_choc_ego");
-                Vector3 pos = player.Position + new Vector3(0, 0, -1f);
+                string modelName = GetPropModelForItem(itemId);
+                Model model = new Model(modelName);
 
-                Prop snackProp = World.CreateProp(propHash, pos, true, false);
+                if (!model.IsLoaded)
+                    model.Request(500);
 
-                if (snackProp != null && snackProp.Exists())
+                if (!model.IsLoaded)
                 {
-                    // ⭐ FIXED: Correct AttachTo() signature
-                    snackProp.AttachTo(player, new Vector3(0.08f, 0.02f, -0.02f), new Vector3(10f, 160f, 20f));
+                    DebugLogger.Error($"[SHOP] Failed to load model '{modelName}'");
+                    return;
+                }
+
+                // Spawn slightly offset to avoid collision issues (esp. Meteorite)
+                Vector3 spawnPos = store.Clerk.Position + store.Clerk.ForwardVector * 0.2f + new Vector3(0f, 0f, 0.1f);
+                Prop snackProp = World.CreateProp(model, spawnPos, true, true);
+
+                if (snackProp == null || !snackProp.Exists())
+                {
+                    DebugLogger.Error($"[SHOP] Failed to create prop '{modelName}'");
+                    return;
                 }
 
                 // ------------------------------------------------------------
-                // PLAY ANIMATION
+                // CLERK HANDOFF ANIMATION
                 // ------------------------------------------------------------
-                player.Task.PlayAnimation(animDict, animName, 8f, -8f, 2500, AnimationFlags.UpperBodyOnly, 0f);
+                store.Clerk.TaskPlayAnim("mp_am_hold_up", "purchase_beer_shopkeeper", 8, -1);
+                Script.Wait(500);
 
-                int animEnd = Game.GameTime + 2500;
+                // Attach to clerk left hand
+                snackProp.AttachTo(store.Clerk.Bones[Bone.SkelLeftHand], new Vector3(0.09f, 0.01f, 0.07f), new Vector3(-170f, 0f, 0f));
+
+                Script.Wait(750);
+                snackProp.Detach();
+                Script.Wait(1000);
+
+                // ------------------------------------------------------------
+                // DETERMINE HAND + OFFSETS FOR PLAYER
+                // ------------------------------------------------------------
+                bool isDrink = itemId == "sprunk" || itemId == "e_colas";
+
+                Bone handBone;
+                Vector3 posOffset;
+                Vector3 rotOffset;
+
+                if (isDrink)
+                {
+                    handBone = Bone.PHRightHand;
+                    posOffset = new Vector3(0.0f, 0.0f, 0.0f);
+                    rotOffset = new Vector3(0.0f, 0.0f, 0.0f);
+                }
+                else
+                {
+                    handBone = Bone.SkelLeftHand;
+                    posOffset = new Vector3(0.08f, 0.02f, -0.02f);
+                    rotOffset = new Vector3(10f, 160f, 20f);
+
+                    if (itemId == "meteorite")
+                    {
+                        posOffset = new Vector3(0.07f, 0.015f, -0.015f);
+                        rotOffset = new Vector3(15f, 160f, 10f);
+                    }
+                }
+
+                // Attach to player hand via native
+                Function.Call(Hash.ATTACH_ENTITY_TO_ENTITY,
+                    snackProp.Handle,
+                    player.Handle,
+                    player.Bones[handBone].Index,
+                    posOffset.X, posOffset.Y, posOffset.Z,
+                    rotOffset.X, rotOffset.Y, rotOffset.Z,
+                    true,  // useSoftPinning
+                    true,  // collision
+                    false, // isPed
+                    false, // vertexIndex
+                    2,     // fixedRot
+                    true   // invMassScale
+                );
+
+                // ------------------------------------------------------------
+                // PLAY CONSUME ANIMATION
+                // ------------------------------------------------------------
+                if (isDrink)
+                {
+                    // Load anim dictionary properly
+                    Function.Call(Hash.REQUEST_ANIM_DICT, animDict);
+                    while (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, animDict))
+                        Script.Yield();
+
+                    // Lock player so nothing interrupts
+                    player.Task.ClearAllImmediately();
+                    player.AlwaysKeepTask = true;
+                    player.BlockPermanentEvents = true;
+
+                    // Play the looping drink animation
+                    player.TaskPlayAnim(animDict, animName, 1, 6000);
+
+                    // Hold the drink animation for a fixed time (Rockstar uses ~2.8s)
+                    int drinkEnd = Game.GameTime + 8000;
+                    while (Game.GameTime < drinkEnd)
+                    {
+                        if (!player.IsPlayingAnim(animDict, animName))
+                            break;
+
+                        Script.Yield();
+                    }
+
+                    // Manually stop the drink animation
+                    Function.Call(Hash.STOP_ANIM_TASK, player.Handle, animDict, animName, 1.0f);
+
+                    // Play vending sound
+                    Function.Call(Hash.PLAY_SOUND_FRONTEND, -1, "VENDING_MACHINE", "VENDING_MACHINE", false);
+                    Script.Wait(6000);
+
+                    // Load throw anim
+                    Function.Call(Hash.REQUEST_ANIM_DICT, "mini@sprunk");
+                    while (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "mini@sprunk"))
+                        Script.Yield();
+
+                    // Play throw animation
+                    player.TaskPlayAnim("mini@sprunk", "plyr_buy_drink_pt3", 0, -1);
+
+                    // Wait for throw animation to finish
+                    while (player.IsPlayingAnim("mini@sprunk", "plyr_buy_drink_pt3"))
+                        Script.Yield();
+
+                    // Restore player state
+                    player.AlwaysKeepTask = false;
+                    player.BlockPermanentEvents = false;
+
+                    if (Function.Call<int>(Hash.GET_PLAYER_WANTED_LEVEL, Game.Player) == 0)
+                        player.PlayAmbientSpeech("GENERIC_DRINK", false);
+
+                    Script.Wait(750);
+
+                    if (snackProp.Exists())
+                    {
+                        snackProp.Detach();
+                        snackProp.ApplyForce(player.RightVector * -5f + player.UpVector * 5f);
+                        snackProp.MarkAsNoLongerNeeded();
+                    }
+                }
+                else
+                {
+                    const string finishDict = "mp_player_inteat@burger";
+                    const string finishAnim = "mp_player_int_eat_burger_fp";
+
+                    PlayerHelper.RequestAnimDict(finishDict);
+                    player.TaskPlayAnim(finishDict, finishAnim, 48, 4000);
+                    Script.Wait(900);
+
+                    if (Function.Call<int>(Hash.GET_PLAYER_WANTED_LEVEL, Game.Player) == 0)
+                        player.PlayAmbientSpeech("GENERIC_EAT", false);
+
+                    Script.Wait(750);
+
+                    if (snackProp.Exists())
+                    {
+                        snackProp.Detach();
+                        snackProp.MarkAsNoLongerNeeded();
+                    }
+                }
+
+                int animEnd = Game.GameTime + 1500;
                 bool cancelled = false;
 
                 // ------------------------------------------------------------
@@ -162,7 +354,6 @@ namespace StoreRobberyEnhanced.Systems
                     Script.Yield();
                 }
 
-                // Cleanup prop
                 PlayerHelper.DeleteProp(snackProp);
 
                 if (cancelled)
@@ -196,19 +387,21 @@ namespace StoreRobberyEnhanced.Systems
                     case "ps_and_qs":
                     case "egochaser":
                     case "meteorite":
-                        player.Health = Math.Min(player.MaxHealth, player.Health + 15);
-                        _ctx.Ui.ShowNotification("~y~Health restored by 15%.");
+                        player.Health = Math.Min(player.MaxHealth, player.Health + 5);
+                        player.PlayAmbientSpeech("GENERIC_EAT", false, null);
+                        _ctx.Ui.ShowNotification("~y~Health restored by 5%.");
                         break;
 
                     case "sprunk":
                     case "e_colas":
-                        player.Health = Math.Min(player.MaxHealth, player.Health + 50);
-                        _ctx.Ui.ShowNotification("~o~Health restored by 50%.");
+                        player.Health = Math.Min(player.MaxHealth, player.Health + 15);
+                        player.PlayAmbientSpeech("GENERIC_DRINK", false, null);
+                        _ctx.Ui.ShowNotification("~o~Health restored by 15%.");
                         break;
 
                     case "bandage":
-                        player.Health = Math.Min(player.MaxHealth, player.Health + 100);
-                        _ctx.Ui.ShowNotification("~g~Health restored by 100%.");
+                        player.Health = Math.Min(player.MaxHealth, player.Health + 50);
+                        _ctx.Ui.ShowNotification("~g~Health restored by 50%.");
                         break;
 
                     default:

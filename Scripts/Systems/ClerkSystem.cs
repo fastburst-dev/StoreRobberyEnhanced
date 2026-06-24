@@ -275,7 +275,8 @@ namespace StoreRobberyEnhanced.Systems
                     return;
 
                 // ⭐ NEW: greet player when they enter
-                PlayClerkEntryGreeting(store, clerk);
+                if (clerk.Position.DistanceTo(player.Position) <= 6f)
+                    PlayClerkEntryGreeting(store, clerk);
 
                 // NORMAL IDLE LOGIC
                 if (!store.ClerkReacted &&
@@ -916,17 +917,18 @@ namespace StoreRobberyEnhanced.Systems
 
                 if (SafeLoadAnimDict("oddjobs@shop_robbery@rob_till"))
                 {
-                    Function.Call(
-                        Hash.TASK_PLAY_ANIM,
-                        clerk.Handle,
-                        "oddjobs@shop_robbery@rob_till",
-                        "enter",
-                        4.0f, -4.0f,
-                        1000,
-                        (int)(AnimationFlags.Loop | AnimationFlags.UpperBodyOnly),
-                        0f,
-                        false, false, false
-                    );
+                    clerk.TaskPlayAnim("oddjobs@shop_robbery@rob_till", "enter", 1 | 16, 1000);
+                    //Function.Call(
+                    //    Hash.TASK_PLAY_ANIM,
+                    //    clerk.Handle,
+                    //    "oddjobs@shop_robbery@rob_till",
+                    //    "enter",
+                    //    4.0f, -4.0f,
+                    //    1000,
+                    //    (int)(AnimationFlags.Loop | AnimationFlags.UpperBodyOnly),
+                    //    0f,
+                    //    false, false, false
+                    //);
 
                     if (_ctx.Config.EnableStalkerMsg)
                         _ctx.Stalker.QueueRobberyMessage();
@@ -937,39 +939,42 @@ namespace StoreRobberyEnhanced.Systems
                 if (SafeLoadAnimDict("oddjobs@shop_robbery@rob_till"))
                 {
                     // Play the give-money animation
-                    Function.Call(
-                        Hash.TASK_PLAY_ANIM,
-                        clerk.Handle,
-                        "oddjobs@shop_robbery@rob_till",
-                        "loop",
-                        8.0f,
-                        -8.0f,
-                        4000,
-                        1 | 2,
-                        0f,
-                        false, false, false
-                    );
+                    clerk.TaskPlayAnim("oddjobs@shop_robbery@rob_till", "loop", 1 | 2, 4000);
+                    //Function.Call(
+                    //    Hash.TASK_PLAY_ANIM,
+                    //    clerk.Handle,
+                    //    "oddjobs@shop_robbery@rob_till",
+                    //    "loop",
+                    //    8.0f,
+                    //    -8.0f,
+                    //    4000,
+                    //    1 | 2,
+                    //    0f,
+                    //    false, false, false
+                    //);
                 }
 
                 Script.Wait(1000);
 
-                Function.Call(Hash.REQUEST_ANIM_DICT, "mp_common");
+                //Function.Call(Hash.REQUEST_ANIM_DICT, "mp_common");
 
-                if (Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "mp_common"))
-                {
-                    Function.Call(
-                        Hash.TASK_PLAY_ANIM,
-                        clerk.Handle,
-                        "mp_common",
-                        "givetake1_a",   // subtle handover motion
-                        4.0f,
-                        -4.0f,
-                        1500,
-                        0 | 16,
-                        0f,
-                        false, false, false
-                    );
-                }
+                //if (Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, "mp_common"))
+                //{
+                //    Function.Call(
+                //        Hash.TASK_PLAY_ANIM,
+                //        clerk.Handle,
+                //        "mp_common",
+                //        "givetake1_a",   // subtle handover motion
+                //        4.0f,
+                //        -4.0f,
+                //        1500,
+                //        0 | 16,
+                //        0f,
+                //        false, false, false
+                //    );
+                //}
+
+                clerk.TaskPlayAnim("mp_common", "givetake1_a", 0|16, -1);
 
                 // ⭐ PLAY QUIET REGISTER / MONEY SOUND
                 // "ROBBERY_MONEY" is a subtle cash-handling sound used in GTA V
@@ -981,6 +986,7 @@ namespace StoreRobberyEnhanced.Systems
                 Function.Call(Hash.PLAY_SOUND_FRONTEND, -1, "ROBBERY_MONEY", "HUD_AWARDS");
                 Script.Wait(300); // small delay to avoid sound overlap
 
+                clerk.PlayAmbientSpeech(_speech.Get("Stall"), false, null);
                 // ⭐ PATCH D — Only spawn bag AFTER animation starts
                 _ctx.Robberies.SpawnLootBag(store, clerk);
 
@@ -1042,7 +1048,7 @@ namespace StoreRobberyEnhanced.Systems
                 store.GreetedPlayer = true;
 
                 // ⭐ FORCE SPEECH (guaranteed)
-                ForceSpeech(clerk, _speech.Get("Idle"), "SPEECH_PARAMS_FORCE");
+                clerk.PlayAmbientSpeech(_speech.Get("Idle"), true, null);
 
                 // ⭐ Small buffer so speech isn't eaten
                 Script.Wait(50);
@@ -1112,7 +1118,7 @@ namespace StoreRobberyEnhanced.Systems
                     //clerk.Task.PlayAnimation(dict, anim, 4f, -1, AnimationFlags.Loop);
                     PlayAnimNative(clerk, dict, anim, AnimationFlags.Loop);
 
-                    SafePlaySpeech(clerk, _speech.Get("Idle"), "SPEECH_PARAMS_FORCE");
+                    clerk.PlayAmbientSpeech(_speech.Get("Idle"), true, null);
 
                     // Record timestamp so we don't restart immediately
                     store.LastIdleTime = now;
@@ -1154,7 +1160,7 @@ namespace StoreRobberyEnhanced.Systems
                     //clerk.Task.PlayAnimation(dict, anim, 4f, -1, AnimationFlags.Loop);
                     PlayAnimNative(clerk, dict, anim, AnimationFlags.Loop);
 
-                    SafePlaySpeech(clerk, _speech.Get("Surrender"), "SPEECH_PARAMS_FORCE");
+                    clerk.PlayAmbientSpeech(_speech.Get("Surrender"), true, null);
 
                     // Record timestamp so we don't restart immediately
                     store.LastIdleTime = now;
@@ -1187,7 +1193,7 @@ namespace StoreRobberyEnhanced.Systems
                 clerk.Task.ClearAllImmediately();
 
                 //Function.Call(Hash.PLAY_PED_AMBIENT_SPEECH_NATIVE, clerk, "SHOP_CLERK_REACT", "SPEECH_PARAMS_FORCE", 0);
-                SafePlaySpeech(clerk, _speech.Get("Threat"), "SPEECH_PARAMS_FORCE");
+                clerk.PlayAmbientSpeech(_speech.Get("Threat"), true, null);
 
                 clerk.Task.HandsUp(-1);
 
@@ -1295,7 +1301,7 @@ namespace StoreRobberyEnhanced.Systems
                     }
 
                     // ⭐ ALWAYS speak during stall, not only when animation starts
-                    SafePlaySpeech(clerk, _speech.Get("Stall"), "SPEECH_PARAMS_FORCE");
+                    clerk.PlayAmbientSpeech(_speech.Get("Stall"), true, null);
 
                     _ctx.Ui.ShowNotification("~y~The clerk is stalling...~s~ Wait for them to open the register.");
                     return;
@@ -1332,9 +1338,9 @@ namespace StoreRobberyEnhanced.Systems
                 SetClerkPhase(store, ClerkPhase.RegisterOpening);
 
                 // Speech
-                SafePlaySpeech(clerk, _speech.Get("Stall"), "SPEECH_PARAMS_FORCE");
+                clerk.PlayAmbientSpeech(_speech.Get("Stall"), true, null);
 
-                PlayAnimNative(clerk, "rcmme_tracey1", "nervous_loop", AnimationFlags.None);
+                clerk.TaskPlayAnim("rcmme_tracey1", "nervous_loop", 0, 4000);
                 DebugLogger.Info($"[ANIM] Clerk at store {store.Id} finished stalling and is now opening the register.");
             }
             catch (Exception ex)
@@ -1410,7 +1416,7 @@ namespace StoreRobberyEnhanced.Systems
                             false, false, false
                         );
 
-                        SafePlaySpeech(clerk, _speech.Get("Register"), "SPEECH_PARAMS_FORCE");
+                        clerk.PlayAmbientSpeech(_speech.Get("Register"), true, null);
 
                         _ctx.Ui.ShowNotification("~y~The clerk is opening the register...~s~ Get ready to grab the cash!");
 
@@ -1502,7 +1508,7 @@ namespace StoreRobberyEnhanced.Systems
                 if (!clerk.IsRagdoll && !store.ClerkFleeing)
                     clerk.Task.ClearAllImmediately();
 
-                SafePlaySpeech(clerk, _speech.Get("CashGrab"), "SPEECH_PARAMS_FORCE");
+                clerk.PlayAmbientSpeech(_speech.Get("CashGrab"), true, null);
 
                 Task.Run(async () =>
                 {
@@ -1528,7 +1534,7 @@ namespace StoreRobberyEnhanced.Systems
                         false, false, false
                     );
 
-                    SafePlaySpeech(clerk, _speech.Get("CashGrab"), "SPEECH_PARAMS_FORCE");
+                    clerk.PlayAmbientSpeech(_speech.Get("CashGrab"), true, null);
 
                     _ctx.Ui.ShowNotification("~y~The clerk is grabbing the cash...~s~ Get ready to toss the bag!");
                     DebugLogger.Info($"[ANIM] Clerk at store {store.Id} is grabbing cash from the register.");
@@ -1624,7 +1630,7 @@ namespace StoreRobberyEnhanced.Systems
                         false, false, false
                     );
 
-                    SafePlaySpeech(clerk, _speech.Get("BagToss"), "SPEECH_PARAMS_FORCE");
+                    clerk.PlayAmbientSpeech(_speech.Get("BagToss"), true, null);
 
                     _ctx.Ui.ShowNotification("~y~The clerk is tossing the bag...~s~ Grab it, crack the safe and get out of there!");
 
@@ -1755,7 +1761,7 @@ namespace StoreRobberyEnhanced.Systems
                 // ⭐ Fleeing is disabled — clerks surrender instead
                 store.ClerkFleeing = false;
 
-                SafePlaySpeech(clerk, _speech.Get("Surrender"), "SPEECH_PARAMS_FORCE");
+                clerk.PlayAmbientSpeech(_speech.Get("Surrender"), true, null);
                 // ⭐ PATCH U — Transition to Surrender Phase
                 if (store.ClerkSurrenderStage == 0)
                 {
@@ -1824,7 +1830,7 @@ namespace StoreRobberyEnhanced.Systems
                     );
 
                     // Speech
-                    SafePlaySpeech(clerk, _speech.Get("Surrender"), "SPEECH_PARAMS_FORCE");
+                    clerk.PlayAmbientSpeech(_speech.Get("Surrender"), true, null);
 
                     _ctx.Ui.ShowNotification("~y~The clerk is surrendering!~s~ Grab the bag, crack the safe and get out of there!");
                     DebugLogger.Info($"[AMIN 2] Clerk at store {store.Id} started surrender sequence.");
@@ -1923,7 +1929,7 @@ namespace StoreRobberyEnhanced.Systems
                         store.ClerkSurrenderStage = 3;
 
                         // Speech
-                        SafePlaySpeech(clerk, _speech.Get("Surrender"), "SPEECH_PARAMS_FORCE");
+                        clerk.PlayAmbientSpeech(_speech.Get("Surrender"), true, null);
 
                         _ctx.Ui.ShowNotification("~y~The clerk is fully surrendered!~s~ Grab the bag, crack the safe and get out of there!");
                         DebugLogger.Info($"[ANIM 2] Clerk at store {store.Id} is fully surrendered.");

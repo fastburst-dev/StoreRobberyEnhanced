@@ -186,6 +186,6 @@ namespace StoreRobberyEnhanced.Scripts.Systems
 
             return false; // animation intact
         }
-        
+
     }
 }
