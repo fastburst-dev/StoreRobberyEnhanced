@@ -420,6 +420,10 @@ v2.7.0.3
  * Fixed issues with Silent robbery not triggering animations
  * Expanded Debugging logic and logging to be more detailed if enabled
 
+v2.7.0.5
+ * Added Shop purchase animations to clerk and player for items purchased and consumed.
+ * Minor code changes clean up and optimizations.
+
 ⭐ CREDITS
 Created by James Neeley (FastBurst)  
 GTA V Mod Developer & Systems Architect
