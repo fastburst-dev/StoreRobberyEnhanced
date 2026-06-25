@@ -225,6 +225,14 @@ namespace StoreRobberyEnhanced.Minigame
 
             DisableGameplayControls();
 
+            // Hard freeze reinforcement (animations sometimes unfreeze ped)
+            if (_playerFrozen && _state.Player != null && _state.Player.Exists())
+            {
+                _state.Player.Velocity = Vector3.Zero;
+                _state.Player.IsPositionFrozen = true;
+            }
+
+
             int now = Game.GameTime;
             if (now - _state.LastUpdateTime < 0)
                 return;
@@ -511,14 +519,40 @@ namespace StoreRobberyEnhanced.Minigame
         // ------------------------------------------------------------
         private void DisableGameplayControls()
         {
+            // Combat + weapons
             Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.Attack);
             Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.Aim);
             Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.Reload);
             Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.MeleeAttack1);
             Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.MeleeAttack2);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.SelectWeapon);
+
+            // Movement
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.MoveUpOnly);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.MoveDownOnly);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.MoveLeftOnly);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.MoveRightOnly);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.Sprint);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.Jump);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.Duck);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.Cover);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.ScriptedFlyZUp);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.ScriptedFlyZDown);
+            // Analog movement axes (the missing piece)
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.MoveLeftRight);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.MoveUpDown);
+
+            // Interaction
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.Enter);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.VehicleExit);
+
+            // Vehicle
             Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.VehicleAccelerate);
             Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.VehicleBrake);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.VehicleMoveLeftRight);
+            Function.Call(Hash.DISABLE_CONTROL_ACTION, 0, (int)Control.VehicleMoveUpDown);
 
+            // Allow camera look
             Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.LookLeftRight);
             Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.LookUpDown);
         }
@@ -534,6 +568,29 @@ namespace StoreRobberyEnhanced.Minigame
             Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.RadioWheelLeftRight);
             Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.RadioWheelUpDown);
             Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.Cover);
+
+            // Restore movement
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.MoveUpOnly);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.MoveDownOnly);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.MoveLeftOnly);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.MoveRightOnly);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.Sprint);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.Jump);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.Duck);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.Cover);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.ScriptedFlyZUp);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.ScriptedFlyZDown);
+            // Analog movement axes (the missing piece)
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.MoveLeftRight);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.MoveUpDown);
+
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.Enter);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.VehicleExit);
+
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.VehicleAccelerate);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.VehicleBrake);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.VehicleMoveLeftRight);
+            Function.Call(Hash.ENABLE_CONTROL_ACTION, 0, (int)Control.VehicleMoveUpDown);
         }
 
         // ------------------------------------------------------------

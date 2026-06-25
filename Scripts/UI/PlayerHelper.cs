@@ -319,7 +319,7 @@ namespace StoreRobberyEnhanced.UI
                     hash == WeaponHash.CandyCane ||
                     hash == WeaponHash.Snowball ||
                     hash == WeaponHash.Ball;
-            
+
 
                 DebugLogger.Trace($"IsMeleeWeapon({hash}) = {result}");
                 return result;
@@ -333,29 +333,7 @@ namespace StoreRobberyEnhanced.UI
 
         public static readonly HashSet<WeaponHash> _notWeapons = new HashSet<WeaponHash>()
         {
-            {WeaponHash.Dagger},  // you can remove this if you consider it a weapon
-            {WeaponHash.Bat},
-            {WeaponHash.Bottle},  // you can remove this if you consider it a weapon
-            {WeaponHash.Crowbar},
             {WeaponHash.Unarmed},
-            {WeaponHash.Flashlight},
-            {WeaponHash.GolfClub},
-            {WeaponHash.Hammer},
-            {WeaponHash.Hatchet},
-            {WeaponHash.KnuckleDuster},  // you can remove this if you consider it a weapon
-            {WeaponHash.Knife},  // you can remove this if you consider it a weapon
-            {WeaponHash.Machete},  // you can remove this if you consider it a weapon
-            {WeaponHash.SwitchBlade},  // you can remove this if you consider it a weapon
-            {WeaponHash.Nightstick},  // you can remove this if you consider it a weapon
-            {WeaponHash.Wrench},
-            {WeaponHash.BattleAxe},
-            {WeaponHash.PoolCue},
-            {WeaponHash.StoneHatchet},
-            {WeaponHash.CandyCane},
-            {WeaponHash.StunGunMultiplayer},  // you can remove this if you consider it a weapon
-            {WeaponHash.StunGun},  // you can remove this if you consider it a weapon
-            {WeaponHash.Flare},
-            {WeaponHash.UpNAtomizer},  // you can remove this if you consider it a weapon
             {WeaponHash.Firework},
             {WeaponHash.Snowball},
             {WeaponHash.Ball},
@@ -365,7 +343,6 @@ namespace StoreRobberyEnhanced.UI
             {WeaponHash.FireExtinguisher},
             {WeaponHash.HazardousJerryCan},
             {WeaponHash.FertilizerCan},
-            {WeaponHash.FlareGun},
         };
 
         // ------------------------------------------------------------
@@ -504,5 +481,45 @@ namespace StoreRobberyEnhanced.UI
             }
 
         }
+
+        public bool IsHoldingPhone()
+        {
+            try
+            {
+                Ped player = Game.Player.Character;
+                if (player == null || !player.Exists())
+                    return false;
+
+                // All known phone models
+                string[] phoneModels =
+                {
+                    "prop_amb_phone",
+                    "prop_amb_phone_01",
+                    "prop_amb_phone_02",
+                    "prop_npc_phone",
+                    "prop_phone_ing",
+                    "prop_phone_ing_02",
+                    "prop_phone_ing_03"
+                };
+
+                foreach (var model in phoneModels)
+                {
+                    int hash = Function.Call<int>(Hash.GET_HASH_KEY, model);
+                    Prop phone = Function.Call<Prop>(Hash.GET_CLOSEST_OBJECT_OF_TYPE,
+                        player.Position.X, player.Position.Y, player.Position.Z,
+                        1.0f, hash, false, false, false);
+
+                    if (phone != null && phone.Exists() && phone.IsAttachedTo(player))
+                        return true;
+                }
+
+                return false;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
     }
 }

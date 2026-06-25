@@ -21,8 +21,8 @@ namespace StoreRobberyEnhanced.Systems
         private bool _testTimerActive = false;
         private int _testTimerEnd = 0;
         // DEBUG ESCAPE STATE
-        private bool _debugEscapeActive = false;
-        private int _debugEscapeStoreId = -1;
+        public bool _debugEscapeActive = false;
+        public int _debugEscapeStoreId = -1;
         private int _lastDebugSubtitleTime = 0;
 
         public RobberySystem(StoreContext ctx)
@@ -49,7 +49,7 @@ namespace StoreRobberyEnhanced.Systems
             }
         }
 
-        
+
         // ------------------------------------------------------------
         // DEBUG ROBBERY START
         // ------------------------------------------------------------
@@ -554,6 +554,10 @@ namespace StoreRobberyEnhanced.Systems
                 if (store.CooldownActive)
                     return;
 
+                // ⭐ ABSOLUTE FREEZE — SafeCrack owns the player
+                if (_ctx.SafeCrack != null && _ctx.SafeCrack.IsRunning)
+                    return;
+
                 // ⭐ Try to start a register robbery (handles silent + loud)
                 TryStartRegisterRobbery(store, player);
 
@@ -804,7 +808,7 @@ namespace StoreRobberyEnhanced.Systems
 
                     _ctx.SaveStoreState(store);
 
-                    if(_ctx.Config.EnableBlips)
+                    if (_ctx.Config.EnableBlips)
                         _ctx.Cooldowns.UpdateStoreBlip(store);
 
                     return;
@@ -1205,7 +1209,7 @@ namespace StoreRobberyEnhanced.Systems
             {
                 if (store == null || clerk == null || !clerk.Exists())
                     return;
-               
+
                 // ⭐ Correct model: white trash bag
                 Model bagModel = new Model("prop_cs_rub_binbag_01");
 

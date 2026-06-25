@@ -54,7 +54,7 @@ namespace StoreRobberyEnhanced.Data
                 // Drinks
                 { "coffee", new ShopItemData("coffee", "Coffee", 3, ShopItemCategory.Drink, "Coffee Cup. Restores 15% health.") },
                 { "juice01", new ShopItemData("juice01", "Juice", 2, ShopItemCategory.Drink, "Juice Drink. Restores 15% health.") },
-                { "sprunk", new ShopItemData("sprunk", "Sprunk", 1, ShopItemCategory.Drink, " Sprunk Carbonated soda. Restores 15% health.") },
+                { "sprunk", new ShopItemData("sprunk", "Sprunk", 1, ShopItemCategory.Drink, "Sprunk soda. Restores 15% health.") },
                 { "e_colas", new ShopItemData("e_colas", "eCola", 1, ShopItemCategory.Drink, "Classic cola drink. Restores 15% health.") },
                 { "beer1", new ShopItemData("beer1", "Bottle of Beer (PiBwasser)", 5, ShopItemCategory.Drink, "Bottle of Beer. Restores 15% health.") },
                 { "beer2", new ShopItemData("beer2", "Bottle of Beer (Logger)", 5, ShopItemCategory.Drink, "Bottle of Beer. Restores 15% health.") },

@@ -44,6 +44,10 @@ namespace StoreRobberyEnhanced.Minigame
             // ------------------------------------------------------------
             float axisX = Function.Call<float>(Hash.GET_CONTROL_NORMAL, 0, (int)Control.MoveLeftRight);
 
+            // If frozen, MoveLeftRight returns 0 — fallback to ScriptedFlyLeftRight
+            if (System.Math.Abs(axisX) < 0.05f)
+                axisX = Function.Call<float>(Hash.GET_CONTROL_NORMAL, 0, (int)Control.FlyLeftRight);
+
             if (System.Math.Abs(axisX) > 0.05f)
                 state.RotationSpeed = axisX * ROTATION_SLOW;
 

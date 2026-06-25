@@ -335,7 +335,7 @@ namespace StoreRobberyEnhanced.Systems
                 {
                     ProcessFlee(store, clerk);
                     return;
-                }                
+                }
 
                 TryTriggerSilentAlarm(store, clerk);
                 TryTriggerPoliceCall(store, clerk, player);
@@ -578,6 +578,14 @@ namespace StoreRobberyEnhanced.Systems
 
                 // WEAPON INFO
                 Weapon current = player.Weapons?.Current;
+
+                // ⭐ PHONE CHECK — phone is NOT a weapon
+                if (ph.IsHoldingPhone())
+                {
+                    DebugLogger.Trace("PlayerThreatValid: Player holding phone → NOT a threat");
+                    return false;
+                }
+
                 bool hasWeapon = current != null && current.Hash != WeaponHash.Unarmed;
 
                 bool isMelee = false;
@@ -974,7 +982,7 @@ namespace StoreRobberyEnhanced.Systems
                 //    );
                 //}
 
-                clerk.TaskPlayAnim("mp_common", "givetake1_a", 0|16, -1);
+                clerk.TaskPlayAnim("mp_common", "givetake1_a", 0 | 16, -1);
 
                 // ⭐ PLAY QUIET REGISTER / MONEY SOUND
                 // "ROBBERY_MONEY" is a subtle cash-handling sound used in GTA V
@@ -994,7 +1002,7 @@ namespace StoreRobberyEnhanced.Systems
 
                 // ⭐ PLAYER NOTIFICATION
                 _ctx.Ui.ShowNotification("~y~Clerk quietly hands over the register cash.~s~ Crack the safe before leaving.");
-                
+
                 DebugLogger.Info($"[ANIM] Played silent robbery anim for store {store.Id} on clerk {clerk.Handle}");
             }
             catch (Exception ex)
