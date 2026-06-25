@@ -109,6 +109,24 @@ namespace StoreRobberyEnhanced.Systems
                 case "e_colas":
                     return "prop_ecola_can";          // Ecola can
 
+                case "coffee":
+                    return "prop_food_coffee";        // Coffee
+
+                case "juice01":
+                    return "prop_food_juice01";       // Juice 1
+                
+                case "beer1":
+                    return "prop_cs_beer_bot_01";     // Beer 1
+
+                case "beer2":
+                    return "prop_cs_beer_bot_02";     // Beer 2
+                
+                case "beer40":
+                    return "prop_cs_beer_bot_40oz_02";     // Beer 40oz
+                
+                case "whiskey":
+                    return "prop_cs_whiskey_bottle";     // Bottle of Whiskey
+
                 case "egochaser":
                     return "prop_choc_ego";           // EgoChaser bar
 
@@ -116,7 +134,22 @@ namespace StoreRobberyEnhanced.Systems
                     return "prop_candy_pqs";          // Ps & Qs bar
 
                 case "meteorite":
-                    return "prop_choc_ego";           // Meteorite bar
+                    return "prop_choc_meto";           // Meteorite bar
+
+                case "sandwich":
+                    return "prop_sandwich_01";        // Sandwich
+
+                case "taco":
+                    return "prop_taco_01";            // Taco 
+
+                case "hotdog":
+                    return "prop_cs_hotdog_01";       // Hotdog
+
+                case "burger":
+                    return "prop_cs_burger_01";       // Burger 
+                
+                case "donut":
+                    return "prop_donut_01";           // Donut 
 
                 default:
                     return "prop_ecola_can";
@@ -129,11 +162,22 @@ namespace StoreRobberyEnhanced.Systems
             {
                 case "sprunk":
                 case "e_colas":
+                case "coffee":
+                case "juice01":
+                case "beer1":
+                case "beer2":
+                case "beer40":
+                case "whiskey":
                     return ("mini@sprunk", "PLYR_BUY_DRINK_PT2");
 
                 case "egochaser":
                 case "ps_and_qs":
                 case "meteorite":
+                case "sandwich":
+                case "taco":
+                case "hotdog":
+                case "burger":
+                case "donut":
                     return ("mp_player_inteat@burger", "mp_player_int_eat_burger_left");
 
                 default:
@@ -210,7 +254,14 @@ namespace StoreRobberyEnhanced.Systems
                 // ------------------------------------------------------------
                 // DETERMINE HAND + OFFSETS FOR PLAYER
                 // ------------------------------------------------------------
-                bool isDrink = itemId == "sprunk" || itemId == "e_colas";
+                bool isDrink = itemId == "sprunk" 
+                    || itemId == "e_colas" 
+                    || itemId == "coffee"
+                    || itemId == "juice01"
+                    || itemId == "beer1"
+                    || itemId == "beer2"
+                    || itemId == "beer40"
+                    || itemId == "whiskey";
 
                 Bone handBone;
                 Vector3 posOffset;
@@ -224,14 +275,16 @@ namespace StoreRobberyEnhanced.Systems
                 }
                 else
                 {
-                    handBone = Bone.SkelLeftHand;
-                    posOffset = new Vector3(0.08f, 0.02f, -0.02f);
-                    rotOffset = new Vector3(10f, 160f, 20f);
+                    handBone = Bone.PHLeftHand;
+                    posOffset = new Vector3(0.025f, 0.015f, -0.025f);
+                    rotOffset = new Vector3(0.0f, 0.0f, 0.0f);
+                    //posOffset = new Vector3(0.08f, 0.02f, -0.02f);
+                    //rotOffset = new Vector3(10f, 160f, 20f);
 
-                    if (itemId == "meteorite")
+                    if (itemId == "taco" || itemId == "hotdog")
                     {
-                        posOffset = new Vector3(0.07f, 0.015f, -0.015f);
-                        rotOffset = new Vector3(15f, 160f, 10f);
+                        posOffset = new Vector3(0.055f, 0.015f, -0.025f);
+                        rotOffset = new Vector3(0f, 0f, 90f);
                     }
                 }
 
@@ -319,18 +372,19 @@ namespace StoreRobberyEnhanced.Systems
                     const string finishAnim = "mp_player_int_eat_burger_fp";
 
                     PlayerHelper.RequestAnimDict(finishDict);
-                    player.TaskPlayAnim(finishDict, finishAnim, 48, 4000);
+                    player.TaskPlayAnim(finishDict, finishAnim, 1, 4000);
                     Script.Wait(900);
 
                     if (Function.Call<int>(Hash.GET_PLAYER_WANTED_LEVEL, Game.Player) == 0)
                         player.PlayAmbientSpeech("GENERIC_EAT", false);
 
-                    Script.Wait(750);
+                    Script.Wait(3000);
 
                     if (snackProp.Exists())
                     {
                         snackProp.Detach();
                         snackProp.MarkAsNoLongerNeeded();
+                        PlayerHelper.DeleteProp(snackProp);
                     }
                 }
 
@@ -387,6 +441,11 @@ namespace StoreRobberyEnhanced.Systems
                     case "ps_and_qs":
                     case "egochaser":
                     case "meteorite":
+                    case "sandwich":
+                    case "taco":
+                    case "hotdog":
+                    case "burger":
+                    case "donut":
                         player.Health = Math.Min(player.MaxHealth, player.Health + 5);
                         player.PlayAmbientSpeech("GENERIC_EAT", false, null);
                         _ctx.Ui.ShowNotification("~y~Health restored by 5%.");
@@ -394,6 +453,12 @@ namespace StoreRobberyEnhanced.Systems
 
                     case "sprunk":
                     case "e_colas":
+                    case "coffee":
+                    case "juice01":
+                    case "beer1":
+                    case "beer2":
+                    case "beer40":
+                    case "whiskey":
                         player.Health = Math.Min(player.MaxHealth, player.Health + 15);
                         player.PlayAmbientSpeech("GENERIC_DRINK", false, null);
                         _ctx.Ui.ShowNotification("~o~Health restored by 15%.");
