@@ -424,6 +424,13 @@ v2.7.0.5
  * Added Shop purchase animations to clerk and player for items purchased and consumed.
  * Minor code changes clean up and optimizations.
 
+v2.7.1.2
+ * Fixed issues with moving during safe crack minigame.
+ * Fixed issue on if player uses phone inside stores, would trigger a robbery scenario falsely
+ * Improved animations for clerk store purchase and consuming animations and prop deletion
+ * Added more food and drink items to clerk store system
+ * Minor code changes and optimizations in several systems
+
 ⭐ CREDITS
 Created by James Neeley (FastBurst)  
 GTA V Mod Developer & Systems Architect

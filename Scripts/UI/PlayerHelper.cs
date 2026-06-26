@@ -66,21 +66,6 @@ namespace StoreRobberyEnhanced.UI
             }
         }
 
-        public static void AttachProp(Prop prop, Ped player, int boneIndex, Vector3 offset, Vector3 rotation)
-        {
-            try
-            {
-                if (prop != null && prop.Exists())
-                {
-                    prop.AttachTo(player, offset, rotation);
-                }
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogException("PlayerHelper.AttachProp", ex);
-            }
-        }
-
         public static void DeleteProp(Prop prop)
         {
             try
@@ -92,122 +77,7 @@ namespace StoreRobberyEnhanced.UI
             {
                 DebugLogger.LogException("PlayerHelper.DeleteProp", ex);
             }
-        }
-
-        // ------------------------------------------------------------
-        // GIVE SNACK TO PLAYER LOGIC
-        // ------------------------------------------------------------
-        public static void GiveSnackToPlayer(string itemId)
-        {
-            try
-            {
-                Ped player = Game.Player.Character;
-                if (player == null || !player.Exists())
-                    return;
-
-                // ------------------------------------------------------------
-                // BLOCK ACTION IF PLAYER IS BUSY
-                // ------------------------------------------------------------
-                if (player.IsInVehicle() || player.IsRagdoll || player.IsDead)
-                {
-                    DebugLogger.Warn("GiveSnackToPlayer: Player busy, skipping.");
-                    return;
-                }
-
-                DebugLogger.Info($"GiveSnackToPlayer: Consuming item '{itemId}'");
-
-                // ------------------------------------------------------------
-                // LOAD ANIMATION DICTIONARY
-                // ------------------------------------------------------------
-                const string animDict = "mp_player_inteat@burger";
-                const string animName = "mp_player_int_eat_burger";
-
-                Function.Call(Hash.REQUEST_ANIM_DICT, animDict);
-                int timeout = Game.GameTime + 2000;
-                while (!Function.Call<bool>(Hash.HAS_ANIM_DICT_LOADED, animDict) && Game.GameTime < timeout)
-                    Script.Yield();
-
-                // ------------------------------------------------------------
-                // CREATE PROP (CHOCOLATE BAR)
-                // ------------------------------------------------------------
-                int propHash = Function.Call<int>(Hash.GET_HASH_KEY, "prop_choc_ego");
-                Vector3 pos = player.Position + new Vector3(0, 0, -1f);
-
-                Prop snackProp = World.CreateProp(propHash, pos, true, false);
-                if (snackProp != null && snackProp.Exists())
-                {
-                    // ⭐ FIXED: Correct AttachTo() signature
-                    snackProp.AttachTo(
-                        player, // right hand bone index
-                        new Vector3(0.08f, 0.02f, -0.02f),
-                        new Vector3(10f, 160f, 20f)
-                    );
-                }
-
-                // ------------------------------------------------------------
-                // PLAY ANIMATION
-                // ------------------------------------------------------------
-                player.Task.PlayAnimation(animDict, animName, 8f, -8f, 2500, AnimationFlags.UpperBodyOnly, 0f);
-
-                int animEnd = Game.GameTime + 2500;
-                bool cancelled = false;
-
-                // ------------------------------------------------------------
-                // SAFECRACK-STYLE CANCEL INPUT
-                // ESC (keyboard) or B (controller)
-                // ------------------------------------------------------------
-                while (Game.GameTime < animEnd)
-                {
-                    bool cancelKey = Game.IsKeyPressed(System.Windows.Forms.Keys.Escape);
-                    bool cancelPad = Function.Call<bool>(Hash.IS_CONTROL_JUST_PRESSED, 0, (int)Control.PhoneCancel);
-
-                    if (cancelKey || cancelPad)
-                    {
-                        cancelled = true;
-                        break;
-                    }
-
-                    Script.Yield();
-                }
-
-                // ------------------------------------------------------------
-                // CLEANUP PROP
-                // ------------------------------------------------------------
-                if (snackProp != null && snackProp.Exists())
-                    snackProp.Delete();
-
-                // ------------------------------------------------------------
-                // CANCEL BEHAVIOR
-                // ------------------------------------------------------------
-                if (cancelled)
-                {
-                    DebugLogger.Info("GiveSnackToPlayer: Snack consumption cancelled.");
-                    return;
-                }
-
-                // ------------------------------------------------------------
-                // APPLY ITEM EFFECTS
-                // ------------------------------------------------------------
-                switch (itemId)
-                {
-                    case "ps_and_qs":
-                    case "egochaser":
-                    case "meteorite":
-                        player.Health = Math.Min(player.MaxHealth, player.Health + 15);
-                        break;
-
-                    default:
-                        DebugLogger.Warn($"GiveSnackToPlayer: Unknown item '{itemId}'");
-                        break;
-                }
-
-                DebugLogger.Info($"GiveSnackToPlayer: Successfully consumed '{itemId}'");
-            }
-            catch (Exception ex)
-            {
-                DebugLogger.LogException("PlayerHelper.GiveSnackToPlayer", ex);
-            }
-        }
+        }        
 
         // ------------------------------------------------------------
         // BASIC STATES
@@ -482,6 +352,9 @@ namespace StoreRobberyEnhanced.UI
 
         }
 
+        // ------------------------------------------------------------
+        // IS HOLDING PHONE CHECK
+        // ------------------------------------------------------------
         public bool IsHoldingPhone()
         {
             try
